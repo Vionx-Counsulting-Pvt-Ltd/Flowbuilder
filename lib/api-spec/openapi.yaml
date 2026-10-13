@@ -2,14 +2,18 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: FlowBuilder workflow, request, team, and reporting API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: workspace
+  - name: workflows
+  - name: requests
+  - name: team
+  - name: reports
 paths:
   /healthz:
     get:
@@ -24,13 +28,635 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getCurrentUser
+      tags: [workspace]
+      summary: Get the signed-in member and workspace
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [workspace]
+      summary: Get tasks, counts, workflows, and recent activity for the dashboard
+      responses:
+        "200":
+          description: Dashboard overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /workflows:
+    get:
+      operationId: listWorkflows
+      tags: [workflows]
+      summary: List workflows available in the current workspace
+      responses:
+        "200":
+          description: Workflow definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Workflow"
+    post:
+      operationId: createWorkflow
+      tags: [workflows]
+      summary: Create a workflow definition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowInput"
+      responses:
+        "201":
+          description: Created workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+  /workflows/{workflowId}:
+    parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getWorkflow
+      tags: [workflows]
+      summary: Get one workflow definition
+      responses:
+        "200":
+          description: Workflow definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "404":
+          description: Workflow not found
+    patch:
+      operationId: updateWorkflow
+      tags: [workflows]
+      summary: Update or change the publication status of a workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowUpdate"
+      responses:
+        "200":
+          description: Updated workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+  /requests:
+    get:
+      operationId: listRequests
+      tags: [requests]
+      summary: List requests visible to the current member
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/RequestStatus"
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RequestSummary"
+    post:
+      operationId: createRequest
+      tags: [requests]
+      summary: Submit a request to a published workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestInput"
+      responses:
+        "201":
+          description: Submitted request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestDetail"
+  /requests/{requestId}:
+    parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getRequest
+      tags: [requests]
+      summary: Get a request, its progress, and audit trail
+      responses:
+        "200":
+          description: Request detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestDetail"
+        "404":
+          description: Request not found
+  /requests/{requestId}/actions:
+    post:
+      operationId: actOnRequest
+      tags: [requests]
+      summary: Approve, reject, or clarify a request
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestActionInput"
+      responses:
+        "200":
+          description: Updated request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestDetail"
+  /users:
+    get:
+      operationId: listUsers
+      tags: [team]
+      summary: List workspace members
+      responses:
+        "200":
+          description: Workspace members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceUser"
+    post:
+      operationId: createUser
+      tags: [team]
+      summary: Add a member to the workspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Added member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceUser"
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      operationId: updateUser
+      tags: [team]
+      summary: Update a member's role or active status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceUser"
+  /roles:
+    get:
+      operationId: listRoles
+      tags: [team]
+      summary: List workspace roles and permissions
+      responses:
+        "200":
+          description: Roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceRole"
+    post:
+      operationId: createRole
+      tags: [team]
+      summary: Create a role with workflow permissions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleInput"
+      responses:
+        "201":
+          description: Created role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceRole"
+  /roles/{roleId}:
+    parameters:
+      - name: roleId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      operationId: updateRole
+      tags: [team]
+      summary: Update a role's name or permissions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdate"
+      responses:
+        "200":
+          description: Updated role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceRole"
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [workspace]
+      summary: List notifications for the current member
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+  /notifications/{notificationId}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [workspace]
+      summary: Mark a notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+  /reports/overview:
+    get:
+      operationId: getReportOverview
+      tags: [reports]
+      summary: Get request volume, turnaround, and approver workload
+      responses:
+        "200":
+          description: Reporting overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportOverview"
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
+    RequestStatus:
+      type: string
+      enum: [submitted, pending_approval, needs_clarification, approved, rejected, completed]
+    WorkflowStatus:
+      type: string
+      enum: [draft, active, inactive]
+    RoutingType:
+      type: string
+      enum: [sequential, parallel, conditional]
+    WorkflowField:
+      type: object
+      required: [id, label, type, required]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        type: { type: string, enum: [text, number, date, select, textarea, checkbox] }
+        required: { type: boolean }
+        placeholder: { type: ["string", "null"] }
+        options:
+          type: array
+          items: { type: string }
+    WorkflowStage:
+      type: object
+      required: [id, name, order, assigneeType, assigneeLabel, slaHours]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        order: { type: integer }
+        assigneeType: { type: string, enum: [role, user, manager] }
+        assigneeId: { type: ["string", "null"] }
+        assigneeLabel: { type: string }
+        slaHours: { type: integer, minimum: 1 }
+        conditionFieldId: { type: ["string", "null"] }
+        conditionValue: { type: ["string", "null"] }
+    Workflow:
+      type: object
+      required: [id, name, category, description, status, version, routing, fields, stages, ownerUserId, ownerName, requestCount, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        description: { type: string }
+        status: { $ref: "#/components/schemas/WorkflowStatus" }
+        version: { type: integer }
+        routing: { $ref: "#/components/schemas/RoutingType" }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowField" }
+        stages:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowStage" }
+        ownerUserId: { type: string }
+        ownerName: { type: string }
+        requestCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    WorkflowInput:
+      type: object
+      required: [name, category, description, routing, fields, stages]
+      properties:
+        name: { type: string, minLength: 2 }
+        category: { type: string }
+        description: { type: string }
+        routing: { $ref: "#/components/schemas/RoutingType" }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowField" }
+        stages:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/WorkflowStage" }
+    WorkflowUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        category: { type: string }
+        description: { type: string }
+        status: { $ref: "#/components/schemas/WorkflowStatus" }
+        routing: { $ref: "#/components/schemas/RoutingType" }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowField" }
+        stages:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/WorkflowStage" }
+    RequestSummary:
+      type: object
+      required: [id, requestCode, workflowId, workflowName, requesterId, requesterName, status, currentStage, currentStageName, totalStages, dueAt, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        requestCode: { type: string }
+        workflowId: { type: string }
+        workflowName: { type: string }
+        requesterId: { type: string }
+        requesterName: { type: string }
+        status: { $ref: "#/components/schemas/RequestStatus" }
+        currentStage: { type: integer }
+        currentStageName: { type: string }
+        totalStages: { type: integer }
+        dueAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AuditEvent:
+      type: object
+      required: [id, actorName, action, comment, createdAt]
+      properties:
+        id: { type: integer }
+        actorName: { type: string }
+        action: { type: string }
+        comment: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    RequestDetail:
+      allOf:
+        - $ref: "#/components/schemas/RequestSummary"
+        - type: object
+          required: [formData, fields, stages, audit]
+          properties:
+            formData:
+              type: object
+              additionalProperties: true
+            fields:
+              type: array
+              items: { $ref: "#/components/schemas/WorkflowField" }
+            stages:
+              type: array
+              items: { $ref: "#/components/schemas/WorkflowStage" }
+            audit:
+              type: array
+              items: { $ref: "#/components/schemas/AuditEvent" }
+    RequestInput:
+      type: object
+      required: [workflowId, formData]
+      properties:
+        workflowId: { type: string }
+        formData:
+          type: object
+          additionalProperties: true
+    RequestActionInput:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [approve, reject, request_clarification, respond_clarification] }
+        comment: { type: ["string", "null"] }
+    CurrentUser:
+      type: object
+      required: [id, name, email, roleId, roleName, tenantId, tenantName, permissions]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        roleId: { type: string }
+        roleName: { type: string }
+        tenantId: { type: string }
+        tenantName: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+    DashboardTask:
+      type: object
+      required: [id, requestCode, workflowName, requesterName, currentStageName, status, dueAt, createdAt, totalStages, currentStage]
+      properties:
+        id: { type: integer }
+        requestCode: { type: string }
+        workflowName: { type: string }
+        requesterName: { type: string }
+        currentStageName: { type: string }
+        status: { $ref: "#/components/schemas/RequestStatus" }
+        dueAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        totalStages: { type: integer }
+        currentStage: { type: integer }
+    MyWorkflow:
+      type: object
+      required: [id, name, category, status, requestCount]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        status: { type: string }
+        requestCount: { type: integer }
+    DashboardSummary:
+      type: object
+      required: [pendingCount, overdueCount, completedToday, allocatedToday, totalRequests, tasks, myWorkflows, recentRequests]
+      properties:
+        pendingCount: { type: integer }
+        overdueCount: { type: integer }
+        completedToday: { type: integer }
+        allocatedToday: { type: integer }
+        totalRequests: { type: integer }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/DashboardTask" }
+        myWorkflows:
+          type: array
+          items: { $ref: "#/components/schemas/MyWorkflow" }
+        recentRequests:
+          type: array
+          items: { $ref: "#/components/schemas/RequestSummary" }
+    WorkspaceUser:
+      type: object
+      required: [id, name, email, roleId, roleName, status, managerId, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        roleId: { type: string }
+        roleName: { type: string }
+        status: { type: string, enum: [active, inactive, invited] }
+        managerId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    UserInput:
+      type: object
+      required: [name, email, roleId]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        roleId: { type: string }
+        managerId: { type: ["string", "null"] }
+    UserUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        roleId: { type: string }
+        status: { type: string, enum: [active, inactive] }
+        managerId: { type: ["string", "null"] }
+    WorkspaceRole:
+      type: object
+      required: [id, name, description, permissions, memberCount, isDefault]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        permissions:
+          type: array
+          items: { type: string, enum: [view, create, approve, admin, report] }
+        memberCount: { type: integer }
+        isDefault: { type: boolean }
+    RoleInput:
+      type: object
+      required: [name, description, permissions]
+      properties:
+        name: { type: string, minLength: 2 }
+        description: { type: string }
+        permissions:
+          type: array
+          items: { type: string, enum: [view, create, approve, admin, report] }
+    RoleUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 2 }
+        description: { type: string }
+        permissions:
+          type: array
+          items: { type: string, enum: [view, create, approve, admin, report] }
+    Notification:
+      type: object
+      required: [id, title, message, type, requestId, read, createdAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        message: { type: string }
+        type: { type: string }
+        requestId: { type: ["integer", "null"] }
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    WorkloadItem:
+      type: object
+      required: [name, pending, completed]
+      properties:
+        name: { type: string }
+        pending: { type: integer }
+        completed: { type: integer }
+    VolumeItem:
+      type: object
+      required: [label, count]
+      properties:
+        label: { type: string }
+        count: { type: integer }
+    ReportOverview:
+      type: object
+      required: [totalRequests, pendingRequests, averageTurnaroundHours, approvalRate, weeklyVolume, workload]
+      properties:
+        totalRequests: { type: integer }
+        pendingRequests: { type: integer }
+        averageTurnaroundHours: { type: number }
+        approvalRate: { type: number }
+        weeklyVolume:
+          type: array
+          items: { $ref: "#/components/schemas/VolumeItem" }
+        workload:
+          type: array
+          items: { $ref: "#/components/schemas/WorkloadItem" }
 

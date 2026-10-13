@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "FlowBuilder"
+description = "A no-code workflow and approvals platform for organizations to build business processes, manage requests, and track work across teams."
+version = "1.0.0"
+id = "artifacts/flowbuilder"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25908
+
+[services.development]
+run = "pnpm --filter @workspace/flowbuilder run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/flowbuilder", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/flowbuilder/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25908"
+BASE_PATH = "/"

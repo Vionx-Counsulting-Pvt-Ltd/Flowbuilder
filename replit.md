@@ -1,15 +1,16 @@
-# [Project name]
+# FlowBuilder
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A workflow and approvals platform for teams to build business processes, submit requests, assign owners, and track decisions.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/flowbuilder run dev` — run the web app
+- `pnpm --filter @workspace/api-server run dev` — run the API server
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- The app uses this project's built-in PostgreSQL database and Clerk authentication.
 
 ## Stack
 
@@ -19,26 +20,32 @@ _Replace the heading above with the project's name, and this line with one sente
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
+- Web: React, Vite, Wouter, TanStack Query, Clerk
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/flowbuilder` — FlowBuilder web app
+- `artifacts/api-server` — API routes, Clerk middleware, and server startup
+- `lib/api-spec/openapi.yaml` — API contract source of truth
+- `lib/db/src/schema/flowbuilder.ts` — FlowBuilder database tables and types
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Each FlowBuilder workspace is tenant-scoped; the signed-in Clerk identity is associated with a local workspace member.
+- Submitted requests retain snapshots of workflow forms and approval stages so later workflow edits do not change existing requests.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+FlowBuilder supports configurable workflows and approval stages, request submission and review, team roles and invitations, notifications, and operational reports.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The project is named Flowbuilder.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run API code generation after changing the OpenAPI contract.
+- Use the managed artifact workflows so configured preview paths and service ports are supplied.
 
 ## Pointers
 
