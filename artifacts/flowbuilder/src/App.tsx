@@ -335,10 +335,11 @@ function WorkflowModal({ workflow, onClose }: { workflow?: Workflow; onClose: ()
 }
 function WorkflowsPage() {
   const qc = useQueryClient(); const query = useListWorkflows(); const update = useUpdateWorkflow(); const create = useCreateWorkflow(); const current = useGetCurrentUser(); const roles = useListRoles();
+  const [, setLocation] = useLocation();
   const canBuild = Boolean(current.data?.permissions.includes('build') || current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner');
   const [search, setSearch] = useState(''); const [tab, setTab] = useState('All'); const [templateRole, setTemplateRole] = useState(''); const [createMessage, setCreateMessage] = useState('');
   const rows = query.data?.filter(w => (tab === 'All' || w.status === tab.toLowerCase()) && `${w.name} ${w.category} ${w.description}`.toLowerCase().includes(search.toLowerCase())) || [];
-  function openEditor(workflowId?: string) { window.open(`${basePath}${workflowId ? `/workflows/${workflowId}/edit` : '/workflows/new'}`, '_blank', 'noopener,noreferrer'); }
+  function openEditor(workflowId?: string) { setLocation(workflowId ? `/workflows/${workflowId}/edit` : '/workflows/new'); }
   function changeStatus(wf: Workflow) { update.mutate({ workflowId: wf.id, data: { status: wf.status === 'active' ? 'inactive' : 'active' } }, { onSuccess: () => invalidate(qc, [getListWorkflowsQueryKey(), getGetWorkflowQueryKey(wf.id)]) }); }
   const role = roles.data?.find(item => item.id === templateRole) || roles.data?.find(item => item.name.toLowerCase() === 'approver') || roles.data?.find(item => item.memberCount > 0) || roles.data?.[0];
   const templateSpecs = [
