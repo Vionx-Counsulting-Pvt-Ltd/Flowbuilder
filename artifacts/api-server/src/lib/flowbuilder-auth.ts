@@ -13,6 +13,7 @@ import {
 import type { NextFunction, Request, Response } from "express";
 import { getAuth } from "@clerk/express";
 import type { WorkflowField, WorkflowStage } from "@workspace/db";
+import { allocateRequestReference } from "./request-reference";
 
 export type MemberContext = {
   id: string;
@@ -252,11 +253,12 @@ async function createStarterWorkspace(input: {
 
     for (const sample of sampleRequests) {
       const createdAt = new Date(now.getTime() - sample.ageHours * 60 * 60 * 1000);
+      const requestCode = await allocateRequestReference(tx, sample.workflow.name, createdAt);
       const [request] = await tx
         .insert(requestsTable)
         .values({
           tenantId,
-          requestCode: `FB-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+          requestCode,
           workflowId: sample.workflow.id,
           requesterId: adminUserId,
           status: sample.status,
@@ -273,11 +275,6 @@ async function createStarterWorkspace(input: {
           updatedAt: createdAt,
         })
         .returning();
-      const requestCode = `FB-${now.getFullYear()}-${String(request.id).padStart(4, "0")}`;
-      await tx
-        .update(requestsTable)
-        .set({ requestCode })
-        .where(eq(requestsTable.id, request.id));
       await tx.insert(auditEventsTable).values({
         tenantId,
         requestId: request.id,

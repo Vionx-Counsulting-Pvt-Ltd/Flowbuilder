@@ -80,6 +80,7 @@ import {
   type MemberContext,
 } from "../lib/flowbuilder-auth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { allocateRequestReference } from "../lib/request-reference";
 import { hydrateReferenceFields, ReferenceDataError, snapshotReferenceFields, storedReferenceFields } from "../lib/reference-data";
 import type {
   WorkflowField,
@@ -1518,30 +1519,31 @@ router.post("/requests", async (req, res): Promise<void> => {
   );
   const dueHours = Math.min(...initialStages.map((stage) => stage.slaHours));
   const createdAt = new Date();
-  const [request] = await db
-    .insert(requestsTable)
-    .values({
-      tenantId: member.tenantId,
-      requestCode: `FB-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
-      workflowId: workflow.id,
-      requesterId: member.id,
-      status: "pending_approval",
-      currentStage: 0,
-      assignedUserId: target.assignedUserId,
-      assignedRoleId: target.assignedRoleId,
-      dueAt: new Date(createdAt.getTime() + dueHours * 60 * 60 * 1000),
-      formData: submissionData,
-      fieldsSnapshot: snapshotReferenceFields(workflow.fields, submissionData),
-      stagesSnapshot: eligibleStages,
-      approvedStageIds: [],
-    })
-    .returning();
-  const requestCode = `FB-${createdAt.getFullYear()}-${String(request.id).padStart(4, "0")}`;
-  const [saved] = await db
-    .update(requestsTable)
-    .set({ requestCode })
-    .where(eq(requestsTable.id, request.id))
-    .returning();
+  const saved = await db.transaction(async tx => {
+    const requestCode = await allocateRequestReference(tx, workflow.name, createdAt);
+    const [request] = await tx
+      .insert(requestsTable)
+      .values({
+        tenantId: member.tenantId,
+        requestCode,
+        workflowId: workflow.id,
+        requesterId: member.id,
+        status: "pending_approval",
+        currentStage: 0,
+        assignedUserId: target.assignedUserId,
+        assignedRoleId: target.assignedRoleId,
+        dueAt: new Date(createdAt.getTime() + dueHours * 60 * 60 * 1000),
+        formData: submissionData,
+        fieldsSnapshot: snapshotReferenceFields(workflow.fields, submissionData),
+        stagesSnapshot: eligibleStages,
+        approvedStageIds: [],
+        createdAt,
+        updatedAt: createdAt,
+      })
+      .returning();
+    return request;
+  });
+  const requestCode = saved.requestCode;
   await recordAudit({
     tenantId: member.tenantId,
     actorUserId: member.id,

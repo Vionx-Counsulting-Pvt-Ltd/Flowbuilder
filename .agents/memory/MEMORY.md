@@ -7,3 +7,4 @@
 - [Workflow deletion policy](workflow-deletion-policy.md) — Admin deletion removes availability, while request history and existing approvals remain intact.
 - [Drizzle index predicates](drizzle-index-predicates.md) — schema push can miss predicate changes on existing named indexes; verify the live definition.
 - [VionX product identity](vionx-product-identity.md) — FlowBuilder is a VionX project; use its official company context for product marketing.
+- [Request reference policy](request-reference-policy.md) — workflow initials, Sri Lanka date and six-digit daily counter; preserve historical references.
