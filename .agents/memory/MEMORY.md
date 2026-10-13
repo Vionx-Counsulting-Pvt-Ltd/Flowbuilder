@@ -1,1 +1,2 @@
 - [FlowBuilder form scope](appsheet-form-scope.md) — builders are Admins + Developer role; keep AppSheet compatibility focused on user-entered forms.
+- [Signed-in UI verification](signed-in-ui-verification.md) — public screenshots cannot confirm editor fixes; verify the affected component's rendered output.
