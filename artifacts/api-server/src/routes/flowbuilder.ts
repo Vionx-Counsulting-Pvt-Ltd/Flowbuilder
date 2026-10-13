@@ -674,6 +674,7 @@ function requestSummary(row: RequestRow) {
 async function getRequestRows(
   tenantId: string,
   limit = 250,
+  scope: { workflowId?: string; requesterId?: string } = {},
 ): Promise<RequestRow[]> {
   return db
     .select({
@@ -689,7 +690,11 @@ async function getRequestRows(
       eq(requestsTable.workflowId, workflowsTable.id),
     )
     .innerJoin(usersTable, eq(requestsTable.requesterId, usersTable.id))
-    .where(eq(requestsTable.tenantId, tenantId))
+    .where(and(
+      eq(requestsTable.tenantId, tenantId),
+      scope.workflowId ? eq(requestsTable.workflowId, scope.workflowId) : undefined,
+      scope.requesterId ? eq(requestsTable.requesterId, scope.requesterId) : undefined,
+    ))
     .orderBy(desc(requestsTable.createdAt))
     .limit(limit);
 }
@@ -1362,7 +1367,10 @@ router.get("/requests", async (req, res): Promise<void> => {
     return;
   }
   const search = query.data.search?.trim().toLowerCase() ?? "";
-  const rows = (await getRequestRows(member.tenantId))
+  const rows = (await getRequestRows(member.tenantId, 250, {
+    workflowId: query.data.workflowId,
+    requesterId: query.data.scope === "mine" ? member.id : undefined,
+  }))
     .filter((row) => canSeeRequest(row, member))
     .filter((row) => !query.data.status || row.request.status === query.data.status)
     .filter(

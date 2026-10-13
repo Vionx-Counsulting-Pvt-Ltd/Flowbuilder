@@ -5,9 +5,18 @@
  * FlowBuilder workflow, request, team, and reporting API
  * OpenAPI spec version: 0.2.0
  */
+import type { ListRequestsScope } from './listRequestsScope';
 import type { RequestStatus } from './requestStatus';
 
 export type ListRequestsParams = {
+/**
+ * Only include requests for this workflow within the current workspace.
+ */
+workflowId?: string;
+/**
+ * Mine limits results to requests submitted by the signed-in member.
+ */
+scope?: ListRequestsScope;
 status?: RequestStatus;
 search?: string;
 };

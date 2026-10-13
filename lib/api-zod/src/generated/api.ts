@@ -1004,6 +1004,8 @@ export const DeleteWorkflowResponse = zod.void()
  * @summary List requests visible to the current member
  */
 export const ListRequestsQueryParams = zod.object({
+  "workflowId": zod.coerce.string().optional().describe('Only include requests for this workflow within the current workspace.'),
+  "scope": zod.enum(['mine', 'visible']).optional().describe('Mine limits results to requests submitted by the signed-in member.'),
   "status": zod.enum(['submitted', 'pending_approval', 'needs_clarification', 'approved', 'rejected', 'completed']).optional(),
   "search": zod.coerce.string().optional()
 })

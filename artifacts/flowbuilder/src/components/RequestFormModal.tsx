@@ -139,7 +139,7 @@ function DrawingCapture({
   </div>;
 }
 
-export default function RequestFormModal({ workflows, onClose, correctionRequestId }: { workflows: Workflow[]; onClose: () => void; correctionRequestId?: number }) {
+export default function RequestFormModal({ workflows, onClose, correctionRequestId, initialWorkflowId }: { workflows: Workflow[]; onClose: () => void; correctionRequestId?: number; initialWorkflowId?: string }) {
   const queryClient = useQueryClient();
   const create = useCreateRequest();
   const correct = useCorrectRequest();
@@ -158,7 +158,7 @@ export default function RequestFormModal({ workflows, onClose, correctionRequest
     ? { email: current.data.email, name: current.data.name, role: current.data.roleName }
     : undefined), [correctionForm.data?.expressionUser, current.data?.email, current.data?.name, current.data?.roleName]);
   const [, setLocation] = useLocation();
-  const [workflowId, setWorkflowId] = useState(workflows.find(workflow => workflow.status === "active")?.id ?? "");
+  const [workflowId, setWorkflowId] = useState(initialWorkflowId ?? workflows.find(workflow => workflow.status === "active")?.id ?? "");
   const detail = useGetWorkflow(workflowId, { query: { queryKey: getGetWorkflowQueryKey(workflowId), enabled: Boolean(workflowId) && correctionRequestId == null, staleTime: 0, refetchInterval: 15000 } });
   const formQuery = correctionRequestId != null ? correctionForm : detail;
   const selected = correctionRequestId != null ? correctionForm.data?.workflow : detail.data ?? workflows.find(workflow => workflow.id === workflowId);
@@ -357,7 +357,7 @@ export default function RequestFormModal({ workflows, onClose, correctionRequest
         <button type="button" className="icon-button" aria-label="Close request form" data-testid="button-close-request-form" disabled={mutation.isPending || Boolean(uploadingField)} onClick={onClose}><X size={18} /></button>
       </div>
       <form onSubmit={submit} className="max-h-[75dvh] space-y-4 overflow-y-auto px-6 py-5">
-        {correctionRequestId == null ? <label className="form-field"><span>Workflow</span><select className="input-control" data-testid="select-request-workflow" value={workflowId} disabled={Boolean(uploadingField) || mutation.isPending} onChange={event => setWorkflowId(event.target.value)} required><option value="">Choose a workflow</option>{workflows.filter(workflow => workflow.status === "active").map(workflow => <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>)}</select></label> : <p className="text-sm font-medium">{selected?.name ?? "Loading correction form…"}</p>}
+        {correctionRequestId == null ? <label className="form-field"><span>Workflow</span><select className="input-control" data-testid="select-request-workflow" value={workflowId} disabled={Boolean(initialWorkflowId) || Boolean(uploadingField) || mutation.isPending} onChange={event => setWorkflowId(event.target.value)} required><option value="">Choose a workflow</option>{workflows.filter(workflow => workflow.status === "active").map(workflow => <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>)}</select></label> : <p className="text-sm font-medium">{selected?.name ?? "Loading correction form…"}</p>}
         {selected?.fields.filter(field => isVisible(field, selected.fields, computedValues, expressionUser)).map(field => {
           const value = computedValues[field.id];
           const required = field.required || Boolean(evaluate(field.requiredIf, selected.fields, { ...computedValues, _THIS: value }, false, expressionUser));

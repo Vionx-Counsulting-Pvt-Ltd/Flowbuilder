@@ -19,6 +19,7 @@ export * from './fieldConditionOperator';
 export * from './getStorageObjectParams';
 export * from './healthStatus';
 export * from './listRequestsParams';
+export * from './listRequestsScope';
 export * from './myWorkflow';
 export * from './notification';
 export * from './personOption';

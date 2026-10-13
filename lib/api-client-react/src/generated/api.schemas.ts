@@ -707,9 +707,25 @@ export interface ReportOverview {
 }
 
 export type ListRequestsParams = {
+/**
+ * Only include requests for this workflow within the current workspace.
+ */
+workflowId?: string;
+/**
+ * Mine limits results to requests submitted by the signed-in member.
+ */
+scope?: ListRequestsScope;
 status?: RequestStatus;
 search?: string;
 };
+
+export type ListRequestsScope = typeof ListRequestsScope[keyof typeof ListRequestsScope];
+
+
+export const ListRequestsScope = {
+  mine: 'mine',
+  visible: 'visible',
+} as const;
 
 export type CreateRequest400FieldErrors = {[key: string]: string};
 

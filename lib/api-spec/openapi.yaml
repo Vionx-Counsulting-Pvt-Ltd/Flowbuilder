@@ -264,6 +264,17 @@ paths:
       tags: [requests]
       summary: List requests visible to the current member
       parameters:
+        - name: workflowId
+          in: query
+          description: Only include requests for this workflow within the current workspace.
+          schema:
+            type: string
+        - name: scope
+          in: query
+          description: Mine limits results to requests submitted by the signed-in member.
+          schema:
+            type: string
+            enum: [mine, visible]
         - name: status
           in: query
           schema:

@@ -42,6 +42,25 @@ test("stale corrections cannot overwrite returned requests; final requests remai
       status: "needs_clarification", assignedUserId: id, fieldsSnapshot: fields,
       stagesSnapshot: stages, routingSnapshot: stages, formData: { name: "Before", creation_code: "original" },
     }).returning();
+    await db.insert(usersTable).values({ id: `${id}-teammate`, tenantId: id, roleId: id,
+      name: "Synthetic teammate", email: "teammate@example.invalid" });
+    await db.insert(workflowsTable).values({ id: `${id}-other-workflow`, tenantId: id,
+      name: "Other synthetic workflow", ownerUserId: id, status: "active", fields, stages });
+    await db.insert(requestsTable).values([
+      { tenantId: id, requestCode: `${id}-teammate`, workflowId: id, requesterId: `${id}-teammate`,
+        status: "approved", fieldsSnapshot: fields, stagesSnapshot: stages },
+      { tenantId: id, requestCode: `${id}-other-workflow`, workflowId: `${id}-other-workflow`,
+        requesterId: id, status: "approved", fieldsSnapshot: fields, stagesSnapshot: stages },
+    ]);
+    const mine = await fetch(`${baseUrl}/requests?workflowId=${encodeURIComponent(id)}&scope=mine&requesterId=${id}-teammate`);
+    assert.equal(mine.status, 200);
+    const mineRows = await mine.json() as Array<{ id: number }>;
+    assert.deepEqual(mineRows.map(row => row.id), [original.id]);
+    const visible = await fetch(`${baseUrl}/requests?workflowId=${encodeURIComponent(id)}&scope=visible`);
+    const visibleRows = await visible.json() as Array<{ id: number }>;
+    assert.equal(visibleRows.length, 2);
+    assert.deepEqual(await (await fetch(`${baseUrl}/requests?workflowId=outside-workspace&scope=mine`)).json(), []);
+    assert.equal((await fetch(`${baseUrl}/requests?scope=invalid`)).status, 400);
     const post = (expectedUpdatedAt: string, name: string) => fetch(
       `${baseUrl}/requests/${original.id}/corrections`, {
         method: "POST", headers: { "content-type": "application/json" },
