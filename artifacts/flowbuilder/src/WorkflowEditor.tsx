@@ -79,7 +79,7 @@ function isPreviewFieldVisible(field: WorkflowField, fields: WorkflowField[], va
 const seed = (): WorkflowInput => ({ name: '', category: 'Operations', description: '', routing: 'sequential', fields: [], stages: [blankStage(1)] });
 const inputClass = 'input-control';
 function Button({ children, className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button {...props} className={`button inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold ${className}`} />;
+  return <button {...props} className={`button inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold ${className}`}>{children}</button>;
 }
 function Label({ title, children, hint }: { title: string; children: ReactNode; hint?: string }) {
   return <label className="form-field"><span>{title}</span>{children}{hint && <small>{hint}</small>}</label>;
