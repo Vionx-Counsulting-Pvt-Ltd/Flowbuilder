@@ -219,6 +219,13 @@ async function startApi(
   t.mock.method(mutableDb, "select", (selection?: unknown) => new FakeQuery("select", state, selection));
   t.mock.method(mutableDb, "insert", (table: unknown) => new FakeQuery("insert", state).from(table));
   t.mock.method(mutableDb, "update", (table: unknown) => new FakeQuery("update", state).from(table));
+  // Transactions must use the same fake database, not the real workspace database.
+  t.mock.method(mutableDb, "transaction", async (callback: (tx: unknown) => Promise<unknown>) => callback({
+    select: mutableDb.select,
+    insert: mutableDb.insert,
+    update: mutableDb.update,
+    execute: async () => ({ rows: [{ nextCounter: 1 }] }),
+  }));
 
   const app = express();
   app.use(express.json());

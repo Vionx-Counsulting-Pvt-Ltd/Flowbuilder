@@ -13,7 +13,7 @@ import {
   useRequestUploadUrl,
 } from "@workspace/api-client-react";
 import type { Workflow, WorkflowField } from "@workspace/api-client-react";
-import { applyLockedReferenceMappings, fillReferenceSelection, computeFormExpressions, evaluateExpression, type ExpressionContext, type ExpressionUser } from "@workspace/workflow-expressions";
+import { applyLockedReferenceMappings, fillReferenceSelection, computeFormExpressions, evaluateExpression, expressionUsesRequestHistory, type ExpressionContext, type ExpressionUser } from "@workspace/workflow-expressions";
 import { ArrowRight, LoaderCircle, MapPin, Paperclip, X } from "lucide-react";
 
 type UploadedWorkflowFile = { fileId: string; name: string; contentType: string; size: number };
@@ -175,6 +175,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
   function updateValue(id: string, value: unknown) {
     setValues(current => fillReferenceSelection(selected?.fields ?? [], current, id, value));
     setErrors(current => ({ ...current, [id]: "" }));
+    if (!create.isPending) create.reset();
   }
 
   async function uploadFiles(field: WorkflowField, fileList: FileList | File[] | null) {
@@ -233,7 +234,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
       const required = field.required || Boolean(evaluate(field.requiredIf, fields, { ...computedValues, _THIS: value }, false, expressionUser));
       if (required && (isEmpty(value) || (field.type === "checkbox" && value !== true))) {
         nextErrors[field.id] = "This field is required.";
-      } else if (field.validIf && !isEmpty(value)) {
+      } else if (field.validIf && !isEmpty(value) && !expressionUsesRequestHistory(field.validIf)) {
         const validation = evaluate(field.validIf, fields, { ...computedValues, _THIS: value }, false, expressionUser);
         const valid = typeof validation === "boolean"
           ? validation
@@ -263,6 +264,12 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
     const formData: Record<string, unknown> = { ...computedValues };
     for (const field of fields) if (field.type === "show" || !isVisible(field, fields, computedValues, expressionUser)) delete formData[field.id];
     create.mutate({ data: { workflowId, formData } }, {
+      onError: error => {
+        const data = error.data;
+        if (data && typeof data === "object" && "fieldErrors" in data && data.fieldErrors && typeof data.fieldErrors === "object") {
+          setErrors(Object.fromEntries(Object.entries(data.fieldErrors).filter(([id, message]) => fields.some(field => field.id === id) && typeof message === "string")) as Record<string, string>);
+        }
+      },
       onSuccess: request => {
         void queryClient.invalidateQueries({ queryKey: getListRequestsQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
@@ -338,6 +345,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
             <label htmlFor={`request-${field.id}`}><span>{field.label}{required ? " *" : ""}</span></label>
             {field.prefix || field.suffix ? <div className="flex items-center gap-2">{field.prefix && <span className="text-xs text-muted-foreground">{field.prefix}</span>}{renderControl(field, value, disabled, required)}{field.suffix && <span className="text-xs text-muted-foreground">{field.suffix}</span>}</div> : renderControl(field, value, disabled, required)}
             {field.appFormula && <small>Calculated automatically; the server recomputes this value on submission.</small>}
+             {expressionUsesRequestHistory(field.validIf) && <small>Checked for duplicates against earlier requests when you submit.</small>}
             {mapping && <small>{mapping.mode === "locked" ? "Filled from the selected table row; locked and verified on submission." : "Suggested from the selected table row; you can edit this answer."}</small>}
             {field.helpText && <small>{field.helpText}</small>}
             {errors[field.id] && <small className="form-error" data-testid={`error-request-${field.id}`}>{errors[field.id]}</small>}

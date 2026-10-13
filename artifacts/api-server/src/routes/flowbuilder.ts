@@ -71,6 +71,8 @@ import {
   expressionIsTrue,
   getExpressionReferences,
   validateExpression,
+  expressionUsesRequestHistory,
+  ExpressionError,
 } from "@workspace/workflow-expressions";
 import { Router, type IRouter, type RequestHandler, type Response } from "express";
 import {
@@ -81,6 +83,7 @@ import {
 } from "../lib/flowbuilder-auth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { allocateRequestReference } from "../lib/request-reference";
+import { lockRequestUniqueness, requestUniquenessChecks, uniquenessFieldIds } from "../lib/request-uniqueness";
 import { authoritativeReferenceAnswers, hydrateReferenceFields, ReferenceDataError, snapshotReferenceFields, storedReferenceFields } from "../lib/reference-data";
 import type {
   WorkflowField,
@@ -263,6 +266,7 @@ function workflowDefinitionError(
         if (!expression?.trim()) continue;
         const validation = validateExpression(expression, fields);
         if (!validation.valid) return `The ${property} expression for “${label}” is invalid: ${validation.error}`;
+        if (property !== "validation" && expressionUsesRequestHistory(expression)) return `ISUNIQUE can only be used in Valid if for “${label}”.`;
       }
     }
     if (
@@ -352,6 +356,8 @@ function formSubmissionError(
   fields: WorkflowField[],
   formData: Record<string, unknown>,
   member: MemberContext,
+  requestUniqueness: Record<string, boolean> = {},
+  fieldErrors: Record<string, string> = {},
 ): string | null {
   for (const field of fields) {
     if (field.type === "show" || !isFieldVisible(field, fields, formData, member)) continue;
@@ -555,12 +561,18 @@ function formSubmissionError(
           fields,
           values: { ...formData, _THIS: value },
           user: { email: member.email, name: member.name, role: member.roleName },
+          currentFieldId: field.id,
+          requestUniqueness,
         });
       } catch {
         return `The validation rule for ${field.label} could not be evaluated.`;
       }
       if (typeof validationValue === "boolean") {
-        if (!validationValue) return field.invalidMessage?.trim() || `${field.label} is not valid.`;
+        if (!validationValue) {
+          const message = field.invalidMessage?.trim() || (expressionUsesRequestHistory(field.validIf) ? `${field.label} already exists in an earlier request.` : `${field.label} is not valid.`);
+          fieldErrors[field.id] = message;
+          return message;
+        }
       } else if (Array.isArray(validationValue)) {
         const chosen = Array.isArray(value) ? value : [value];
         if (chosen.some((item) => !validationValue.some((allowed) => String(allowed) === String(item)))) {
@@ -1424,9 +1436,18 @@ router.post("/requests", async (req, res): Promise<void> => {
       delete submissionData[field.id];
     }
   }
-  const formError = formSubmissionError(workflow.fields, submissionData, member);
+  const fieldErrors: Record<string, string> = {};
+  let uniqueChecks: Record<string, boolean>;
+  try {
+    uniqueChecks = await requestUniquenessChecks(db, member.tenantId, workflow, submissionData);
+  } catch (error) {
+    if (!(error instanceof ExpressionError)) throw error;
+    res.status(400).json({ error: error.message });
+    return;
+  }
+  const formError = formSubmissionError(workflow.fields, submissionData, member, uniqueChecks, fieldErrors);
   if (formError) {
-    res.status(400).json({ error: formError });
+    res.status(400).json({ error: formError, fieldErrors });
     return;
   }
   const selectedPeople = new Set<string>();
@@ -1535,7 +1556,18 @@ router.post("/requests", async (req, res): Promise<void> => {
   );
   const dueHours = Math.min(...initialStages.map((stage) => stage.slaHours));
   const createdAt = new Date();
+  let uniquenessFailure: { error: string; fieldErrors: Record<string, string> } | undefined;
   const saved = await db.transaction(async tx => {
+    if (uniquenessFieldIds(workflow.fields).length) {
+      await lockRequestUniqueness(tx, member.tenantId, workflow.id);
+      const lockedChecks = await requestUniquenessChecks(tx, member.tenantId, workflow, submissionData);
+      const lockedErrors: Record<string, string> = {};
+      const error = formSubmissionError(workflow.fields, submissionData, member, lockedChecks, lockedErrors);
+      if (error) {
+        uniquenessFailure = { error, fieldErrors: lockedErrors };
+        return null;
+      }
+    }
     const requestCode = await allocateRequestReference(tx, workflow.name, createdAt);
     const [request] = await tx
       .insert(requestsTable)
@@ -1559,6 +1591,10 @@ router.post("/requests", async (req, res): Promise<void> => {
       .returning();
     return request;
   });
+  if (!saved) {
+    res.status(400).json(uniquenessFailure);
+    return;
+  }
   const requestCode = saved.requestCode;
   await recordAudit({
     tenantId: member.tenantId,

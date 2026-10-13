@@ -21,6 +21,8 @@ export type ExpressionContext = {
   values: Record<string, unknown>;
   user?: ExpressionUser;
   now?: Date;
+  currentFieldId?: string;
+  requestUniqueness?: Record<string, boolean>;
 };
 
 export type ExpressionFieldDefinition = ExpressionField & {
@@ -45,6 +47,7 @@ export const expressionFunctions: ExpressionFunction[] = [
   { name: "AND", signature: "AND(condition, condition, ...)", description: "True only when every condition is true.", example: 'AND([Amount] > 0, [Department] = "Finance")' },
   { name: "OR", signature: "OR(condition, condition, ...)", description: "True when any condition is true.", example: 'OR([Priority] = "Urgent", [Amount] > 5000)' },
   { name: "NOT", signature: "NOT(condition)", description: "Reverse a true/false value.", example: "NOT(ISBLANK([Email]))" },
+  { name: "ISUNIQUE", signature: "ISUNIQUE([_THIS])", description: "Valid if only: reject a value used by an earlier request in this workflow and workspace. Checked on submission.", example: "ISUNIQUE([EPF])" },
   { name: "ISBLANK", signature: "ISBLANK(value)", description: "Check whether a value is empty.", example: "ISBLANK([Notes])" },
   { name: "ISNOTBLANK", signature: "ISNOTBLANK(value)", description: "Check whether a value is not empty.", example: "ISNOTBLANK([Manager])" },
   { name: "IN", signature: "IN(value, list)", description: "Check whether a value is in a list.", example: 'IN([Department], LIST("Finance", "People"))' },
@@ -374,7 +377,7 @@ function walk(node: Node, visit: (node: Node) => void): void {
 
 function arityError(name: string, count: number): string | null {
   const exact: Record<string, number[]> = {
-    IF: [3], NOT: [1], ISBLANK: [1], ISNOTBLANK: [1], IN: [2], CONTAINS: [2],
+    IF: [3], NOT: [1], ISUNIQUE: [1], ISBLANK: [1], ISNOTBLANK: [1], IN: [2], CONTAINS: [2],
     COUNT: [1], ANY: [1], INDEX: [2], UNIQUE: [1], INTERSECT: [2], TOP: [2], SPLIT: [2], TEXT: [1],
     DOMAINOF: [1], ENCODEURL: [1], FIND: [2], INITIALS: [1], MID: [3], SUBSTITUTE: [3],
     NUMBER: [1], DECIMAL: [1], ABS: [1], AVERAGE: [1], CEILING: [1], FLOOR: [1],
@@ -409,6 +412,9 @@ function parseAndValidate(source: string, fields?: ExpressionField[]): { ast: No
       if (!supportedFunctions.has(node.name)) throw new ExpressionError(`The function ${node.name} is not supported.`);
       const error = arityError(node.name, node.args.length);
       if (error) throw new ExpressionError(error);
+      if (node.name === "ISUNIQUE" && node.args[0]?.kind !== "reference") {
+        throw new ExpressionError("ISUNIQUE expects a field reference, like [EPF] or [_THIS].");
+      }
     }
   });
   const uniqueReferences = [...new Set(references)];
@@ -430,6 +436,36 @@ export function validateExpression(source: string, fields?: ExpressionField[]): 
 
 export function getExpressionReferences(source: string): string[] {
   return parseAndValidate(source).references;
+}
+
+export function expressionUsesRequestHistory(source?: string | null): boolean {
+  if (!source?.trim()) return false;
+  try {
+    let found = false;
+    walk(parseAndValidate(source).ast, node => {
+      if (node.kind === "call" && node.name === "ISUNIQUE") found = true;
+    });
+    return found;
+  } catch { return false; }
+}
+
+export function getUniqueFieldIds(source: string, fields: ExpressionField[], currentFieldId: string): string[] {
+  const ids = new Set<string>();
+  walk(parseAndValidate(source, fields).ast, node => {
+    if (node.kind !== "call" || node.name !== "ISUNIQUE") return;
+    const field = uniqueArgumentField(node.args[0], fields, currentFieldId);
+    ids.add(field.id);
+  });
+  return [...ids];
+}
+
+function uniqueArgumentField(argument: Node, fields: ExpressionField[], currentFieldId: string): ExpressionField {
+  if (argument.kind !== "reference") throw new ExpressionError("ISUNIQUE expects a field reference.");
+  const field = argument.name.toUpperCase() === "_THIS"
+    ? fields.find(candidate => candidate.id === currentFieldId)
+    : fields.find(candidate => [candidate.id, candidate.key, candidate.label].some(name => name?.trim().toLocaleLowerCase() === argument.name.trim().toLocaleLowerCase()));
+  if (!field) throw new ExpressionError(`No field matches [${argument.name}].`);
+  return field;
 }
 
 export function getExpressionDereferences(source: string): { field: string; column: string }[] {
@@ -509,6 +545,12 @@ function evaluateNode(node: Node, context: ExpressionContext, depth = 0): unknow
   if (depth > MAX_NESTING) throw new ExpressionError("This expression is nested too deeply.");
   if (node.kind === "literal") return node.value;
   if (node.kind === "reference") return resolveReference(node.name, context);
+  if (node.kind === "call" && node.name === "ISUNIQUE") {
+    const { id } = uniqueArgumentField(node.args[0], context.fields, context.currentFieldId ?? "");
+    const result = context.requestUniqueness?.[id];
+    if (typeof result !== "boolean") throw new ExpressionError("ISUNIQUE is checked against earlier requests on submission.");
+    return result;
+  }
   if (node.kind === "dereference") {
     const { field, column } = resolveDereferenceColumn(node.name, node.column, context.fields);
     const selected = context.values[field.id];

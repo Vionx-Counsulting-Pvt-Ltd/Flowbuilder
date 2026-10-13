@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CreateRequest400,
   CurrentUser,
   DashboardSummary,
   GetStorageObjectParams,
@@ -1505,7 +1506,7 @@ return customFetch<RequestDetail>(getCreateRequestUrl(),
 
 export const getCreateRequestMutationKey = () => ['createRequest'] as const;
 
-export const getCreateRequestMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateRequestMutationOptions = <TError = ErrorType<CreateRequest400>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRequest>>, TError,CreateRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createRequest>>, TError,CreateRequestMutationVariables, TContext> => {
 
@@ -1534,13 +1535,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateRequestMutationResult = NonNullable<Awaited<ReturnType<typeof createRequest>>>
     export type CreateRequestMutationBody = BodyType<RequestInput>
-    export type CreateRequestMutationError = ErrorType<unknown>
+    export type CreateRequestMutationError = ErrorType<CreateRequest400>
     export type CreateRequestMutationVariables = {data: BodyType<RequestInput>}
 
     /**
  * @summary Submit a request to a published workflow
  */
-export const useCreateRequest = <TError = ErrorType<unknown>,
+export const useCreateRequest = <TError = ErrorType<CreateRequest400>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRequest>>, TError,CreateRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createRequest>>,

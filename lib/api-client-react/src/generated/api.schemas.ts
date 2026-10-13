@@ -682,6 +682,13 @@ status?: RequestStatus;
 search?: string;
 };
 
+export type CreateRequest400FieldErrors = {[key: string]: string};
+
+export type CreateRequest400 = {
+  error: string;
+  fieldErrors?: CreateRequest400FieldErrors;
+};
+
 export type GetStorageObjectParams = {
 /**
  * Open supported PDFs, raster images and plain text inline; other types remain downloads.

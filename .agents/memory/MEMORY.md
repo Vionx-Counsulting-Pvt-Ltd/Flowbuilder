@@ -9,3 +9,5 @@
 - [VionX product identity](vionx-product-identity.md) — FlowBuilder is a VionX project; use its official company context for product marketing.
 - [Request reference policy](request-reference-policy.md) — workflow initials, Sri Lanka date and six-digit daily counter; preserve historical references.
 - [Attachment preview safety](attachment-preview-safety.md) — uploaded active content must never execute on the authenticated portal's origin.
+- [EPF uniqueness policy](epf-uniqueness-policy.md) — check Staff Onboarding request history within the same workflow and workspace, not employee tables.
+- [Drizzle test isolation](drizzle-test-isolation.md) — outer query mocks do not isolate transactions; transaction-scoped operations need their own test doubles.

@@ -7,6 +7,8 @@
  */
 
 export * from './auditEvent';
+export * from './createRequest400';
+export * from './createRequest400FieldErrors';
 export * from './currentUser';
 export * from './dashboardSummary';
 export * from './dashboardTask';

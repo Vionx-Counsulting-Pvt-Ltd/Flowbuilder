@@ -292,6 +292,18 @@ paths:
             schema:
               $ref: "#/components/schemas/RequestInput"
       responses:
+        "400":
+          description: Invalid form answers, including duplicate values rejected by ISUNIQUE
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
+                  fieldErrors:
+                    type: object
+                    additionalProperties: { type: string }
         "201":
           description: Submitted request
           content:

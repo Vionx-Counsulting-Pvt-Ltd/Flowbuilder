@@ -11,7 +11,7 @@ import {
   useListRoles, useListUsers, useUpdateWorkflow,
 } from '@workspace/api-client-react';
 import type { WorkflowField, WorkflowInput, WorkflowStage } from '@workspace/api-client-react';
-import { applyLockedReferenceMappings, fillReferenceSelection, referenceColumnCompatible, computeFormExpressions, evaluateExpression, expressionFunctions, validateExpression, type ExpressionContext, type ExpressionUser } from '@workspace/workflow-expressions';
+import { applyLockedReferenceMappings, fillReferenceSelection, referenceColumnCompatible, computeFormExpressions, evaluateExpression, expressionFunctions, expressionUsesRequestHistory, validateExpression, type ExpressionContext, type ExpressionUser } from '@workspace/workflow-expressions';
 import { useReferenceFields } from './lib/use-reference-fields';
 import FieldTableSource from './components/FieldTableSource';
 import TableChoiceMatch from './components/TableChoiceMatch';
@@ -273,7 +273,7 @@ export default function WorkflowEditor() {
       else if (['number', 'decimal', 'percent', 'price'].includes(field.type) && value !== undefined && field.max != null && Number(value) > field.max) errors[field.id] = `Enter a number no greater than ${field.max}.`;
       else if (typeof value === 'string' && field.minLength != null && value.length < field.minLength) errors[field.id] = `Use at least ${field.minLength} characters.`;
       else if (typeof value === 'string' && field.maxLength != null && value.length > field.maxLength) errors[field.id] = `Use no more than ${field.maxLength} characters.`;
-      else if (field.validIf) {
+      else if (field.validIf && !expressionUsesRequestHistory(field.validIf)) {
         const validation = expressionResult(field.validIf, resolvedFields, { ...previewValues, _THIS: value }, false, previewUser);
         const valid = typeof validation === 'boolean'
           ? validation

@@ -6,6 +6,8 @@ import {
   expressionFunctions,
   getExpressionReferences,
   getExpressionDereferences,
+  expressionUsesRequestHistory,
+  getUniqueFieldIds,
   validateExpression,
   type ExpressionContext,
 } from "./index";
@@ -182,4 +184,20 @@ test("validates unknown fields, unsupported functions, and syntax", () => {
   assert.deepEqual(validateExpression("EXECUTE(1)", context.fields).valid, false);
   assert.deepEqual(validateExpression("SELECT(1)", context.fields).valid, false);
   assert.deepEqual(validateExpression('IF([Amount] > 0, "yes")', context.fields).valid, false);
+});
+
+test("ISUNIQUE accepts current-field and named-field references and requires authoritative checks", () => {
+  const fields = [{ id: "epf", key: "staff_epf", label: "EPF", type: "number" }];
+  assert.equal(validateExpression("ISUNIQUE([_THIS])", fields).valid, true);
+  assert.equal(validateExpression("ISUNIQUE([EPF])", fields).valid, true);
+  assert.equal(validateExpression("ISUNIQUE(1003)", fields).valid, false);
+  assert.equal(validateExpression("ISUNIQUE([EPF], 1)", fields).valid, false);
+  assert.equal(validateExpression("ISUNIQUE([Unknown])", fields).valid, false);
+  assert.deepEqual(getUniqueFieldIds("AND(ISUNIQUE([_THIS]), ISUNIQUE([staff_epf]))", fields, "epf"), ["epf"]);
+  assert.equal(expressionUsesRequestHistory('CONTAINS("ISUNIQUE([EPF])", "EPF")'), false);
+  assert.equal(expressionUsesRequestHistory("IF(TRUE, ISUNIQUE([EPF]), TRUE)"), true);
+  const ctx = { fields, values: { epf: 1003, _THIS: 1003 }, currentFieldId: "epf" };
+  assert.throws(() => evaluateExpression("ISUNIQUE([EPF])", ctx), /on submission/);
+  assert.equal(evaluateExpression("ISUNIQUE([_THIS])", { ...ctx, requestUniqueness: { epf: false } }), false);
+  assert.equal(evaluateExpression("AND([EPF] > 0, ISUNIQUE([EPF]))", { ...ctx, requestUniqueness: { epf: true } }), true);
 });
