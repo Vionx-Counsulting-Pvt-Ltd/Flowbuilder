@@ -250,9 +250,9 @@ export default function WorkflowEditor() {
       <div className="fb-breadcrumb"><span>WORKFLOW BUILDER</span><i>/</i><b>{workflowId ? 'EDIT' : 'NEW FORM'}</b></div>
       <div className="fb-actions">
         <span className={`fb-save-state ${saved ? 'is-saved' : ''}`} aria-live="polite">{saved ? <><Check size={13} /> Saved just now</> : workflowStatus === 'active' ? 'Published workflow' : 'Draft definition'}</span>
-        <Button className="button-outline fb-preview-button" type="button" onClick={() => setPreviewOpen(true)} data-testid="button-preview"><Eye size={15} /> Preview</Button>
-        <Button className="button-outline fb-save-button" type="button" disabled={busy || issues.length > 0} onClick={e => save(e as unknown as FormEvent, 'draft')} data-testid="button-save-draft">{busy ? 'Saving…' : 'Save draft'}</Button>
-        <Button className="button-primary fb-publish-button" type="button" disabled={busy} onClick={() => { setValidated(true); if (!issues.length) setPublishConfirm(true); }} data-testid="button-publish">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save & publish' : 'Publish'} <ArrowRight size={15} /></Button>
+        <Button className="button-outline fb-preview-button" type="button" aria-label="Preview workflow" onClick={() => setPreviewOpen(true)} data-testid="button-preview"><Eye size={15} /><span className="fb-action-label">Preview</span></Button>
+        <Button className="button-outline fb-save-button" type="button" aria-label={busy ? 'Saving draft' : 'Save draft'} disabled={busy || issues.length > 0} onClick={e => save(e as unknown as FormEvent, 'draft')} data-testid="button-save-draft"><span className="fb-action-label">{busy ? 'Saving…' : 'Save draft'}</span></Button>
+        <Button className="button-primary fb-publish-button" type="button" aria-label={busy ? 'Publishing workflow' : workflowStatus === 'active' ? 'Save and publish workflow' : 'Publish workflow'} disabled={busy} onClick={() => { setValidated(true); if (!issues.length) setPublishConfirm(true); }} data-testid="button-publish"><span className="fb-action-label">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save & publish' : 'Publish'}</span><ArrowRight size={15} /></Button>
       </div>
     </header>
     <form id="workflow-definition" onSubmit={submitDraft}>
