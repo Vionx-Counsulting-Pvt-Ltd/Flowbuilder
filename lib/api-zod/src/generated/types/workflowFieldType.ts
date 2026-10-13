@@ -11,9 +11,16 @@ export type WorkflowFieldType = typeof WorkflowFieldType[keyof typeof WorkflowFi
 
 export const WorkflowFieldType = {
   text: 'text',
+  textarea: 'textarea',
   number: 'number',
   date: 'date',
+  time: 'time',
+  datetime: 'datetime',
   select: 'select',
-  textarea: 'textarea',
+  multiselect: 'multiselect',
   checkbox: 'checkbox',
+  radio: 'radio',
+  file: 'file',
+  people: 'people',
+  lookup: 'lookup',
 } as const;

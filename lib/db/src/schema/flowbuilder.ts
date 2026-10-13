@@ -12,9 +12,43 @@ import {
 export type WorkflowField = {
   id: string;
   label: string;
-  type: "text" | "number" | "date" | "select" | "textarea" | "checkbox";
+  type:
+    | "text"
+    | "textarea"
+    | "number"
+    | "date"
+    | "time"
+    | "datetime"
+    | "select"
+    | "multiselect"
+    | "checkbox"
+    | "radio"
+    | "file"
+    | "people"
+    | "lookup";
   required: boolean;
+  key?: string | null;
   placeholder?: string | null;
+  helpText?: string | null;
+  readOnly?: boolean;
+  hidden?: boolean;
+  defaultValue?: string | null;
+  width?: number;
+  prefix?: string | null;
+  suffix?: string | null;
+  min?: number | null;
+  max?: number | null;
+  minLength?: number | null;
+  maxLength?: number | null;
+  multiple?: boolean;
+  accept?: string | null;
+  maxFiles?: number;
+  maxFileSizeMB?: number;
+  displayCondition?: {
+    fieldId: string;
+    operator: "equals" | "notEquals" | "contains";
+    value: string;
+  } | null;
   options?: string[];
 };
 
@@ -48,7 +82,7 @@ export const rolesTable = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     permissions: jsonb("permissions")
-      .$type<Array<"view" | "create" | "approve" | "admin" | "report">>()
+      .$type<Array<"view" | "create" | "approve" | "admin" | "report" | "build">>()
       .notNull()
       .default([]),
     isDefault: boolean("is_default").notNull().default(false),

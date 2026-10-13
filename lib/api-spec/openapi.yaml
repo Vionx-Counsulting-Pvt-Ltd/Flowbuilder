@@ -14,6 +14,7 @@ tags:
   - name: requests
   - name: team
   - name: reports
+  - name: storage
 paths:
   /healthz:
     get:
@@ -235,6 +236,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceUser"
+  /people:
+    get:
+      operationId: listPeople
+      tags: [team]
+      summary: List active workspace people for workflow fields
+      responses:
+        "200":
+          description: Active workspace people
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PersonOption"
   /users/{userId}:
     parameters:
       - name: userId
@@ -358,6 +373,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReportOverview"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a private file upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+  /storage/objects/{fileId}:
+    get:
+      operationId: getStorageObject
+      tags: [storage]
+      summary: Download a private workspace file
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Private file contents
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
 components:
   schemas:
     HealthStatus:
@@ -381,12 +430,39 @@ components:
       properties:
         id: { type: string }
         label: { type: string }
-        type: { type: string, enum: [text, number, date, select, textarea, checkbox] }
+        type: { type: string, enum: [text, textarea, number, date, time, datetime, select, multiselect, checkbox, radio, file, people, lookup] }
         required: { type: boolean }
         placeholder: { type: ["string", "null"] }
         options:
           type: array
           items: { type: string }
+        key: { type: ["string", "null"] }
+        helpText: { type: ["string", "null"] }
+        readOnly: { type: boolean }
+        hidden: { type: boolean }
+        defaultValue: { type: ["string", "null"] }
+        width: { type: integer, minimum: 1, maximum: 6 }
+        prefix: { type: ["string", "null"] }
+        suffix: { type: ["string", "null"] }
+        min: { type: ["number", "null"] }
+        max: { type: ["number", "null"] }
+        minLength: { type: ["integer", "null"], minimum: 0 }
+        maxLength: { type: ["integer", "null"], minimum: 0 }
+        multiple: { type: boolean }
+        accept: { type: ["string", "null"] }
+        maxFiles: { type: integer, minimum: 1, maximum: 10 }
+        maxFileSizeMB: { type: integer, minimum: 1, maximum: 25 }
+        displayCondition:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/FieldCondition"
+    FieldCondition:
+      type: object
+      required: [fieldId, operator, value]
+      properties:
+        fieldId: { type: string }
+        operator: { type: string, enum: [equals, notEquals, contains] }
+        value: { type: string }
     WorkflowStage:
       type: object
       required: [id, name, order, assigneeType, assigneeLabel, slaHours]
@@ -601,7 +677,7 @@ components:
         description: { type: string }
         permissions:
           type: array
-          items: { type: string, enum: [view, create, approve, admin, report] }
+          items: { type: string, enum: [view, create, approve, admin, report, build] }
         memberCount: { type: integer }
         isDefault: { type: boolean }
     RoleInput:
@@ -612,7 +688,7 @@ components:
         description: { type: string }
         permissions:
           type: array
-          items: { type: string, enum: [view, create, approve, admin, report] }
+          items: { type: string, enum: [view, create, approve, admin, report, build] }
     RoleUpdate:
       type: object
       properties:
@@ -620,7 +696,28 @@ components:
         description: { type: string }
         permissions:
           type: array
-          items: { type: string, enum: [view, create, approve, admin, report] }
+          items: { type: string, enum: [view, create, approve, admin, report, build] }
+    PersonOption:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        size: { type: integer, minimum: 1, maximum: 26214400 }
+        contentType: { type: string, minLength: 1, maxLength: 255 }
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, fileId, metadata]
+      properties:
+        uploadURL: { type: string, format: uri }
+        fileId: { type: string, format: uuid }
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
     Notification:
       type: object
       required: [id, title, message, type, requestId, read, createdAt]

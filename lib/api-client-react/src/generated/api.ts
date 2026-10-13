@@ -25,6 +25,7 @@ import type {
   HealthStatus,
   ListRequestsParams,
   Notification,
+  PersonOption,
   ReportOverview,
   RequestActionInput,
   RequestDetail,
@@ -32,6 +33,8 @@ import type {
   RequestSummary,
   RoleInput,
   RoleUpdate,
+  UploadUrlRequest,
+  UploadUrlResponse,
   UserInput,
   UserUpdate,
   Workflow,
@@ -1134,6 +1137,83 @@ export const useCreateUser = <TError = ErrorType<unknown>,
       return useMutation(getCreateUserMutationOptions(options));
     }
 
+export const getListPeopleUrl = () => {
+
+
+
+
+  return `/api/people`
+}
+
+/**
+ * @summary List active workspace people for workflow fields
+ */
+export const listPeople = async ( options?: Parameters<typeof customFetch>[1]): Promise<PersonOption[]> => {
+
+  return customFetch<PersonOption[]>(getListPeopleUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPeopleQueryKey = () => {
+    return [
+    `/api/people`
+    ] as const;
+    }
+
+
+export const getListPeopleQueryOptions = <TData = Awaited<ReturnType<typeof listPeople>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPeople>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPeopleQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPeople>>> = ({ signal }) => listPeople({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPeople>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPeopleQueryResult = NonNullable<Awaited<ReturnType<typeof listPeople>>>
+export type ListPeopleQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active workspace people for workflow fields
+ */
+
+export function useListPeople<TData = Awaited<ReturnType<typeof listPeople>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPeople>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPeopleQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getUpdateUserUrl = (userId: string,) => {
 
 
@@ -1693,6 +1773,171 @@ export function useGetReportOverview<TData = Awaited<ReturnType<typeof getReport
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetReportOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRequestUploadUrlUrl = () => {
+
+
+
+
+  return `/api/storage/uploads/request-url`
+}
+
+/**
+ * @summary Request a private file upload URL
+ */
+export const requestUploadUrl = async (uploadUrlRequest: UploadUrlRequest, options?: Parameters<typeof customFetch>[1]): Promise<UploadUrlResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<UploadUrlResponse>(getRequestUploadUrlUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadUrlRequest)
+  }
+);}
+
+
+
+
+
+export const getRequestUploadUrlMutationKey = () => ['requestUploadUrl'] as const;
+
+export const getRequestUploadUrlMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,RequestUploadUrlMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,RequestUploadUrlMutationVariables, TContext> => {
+
+const mutationKey = getRequestUploadUrlMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestUploadUrl>>, RequestUploadUrlMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestUploadUrl(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestUploadUrlMutationResult = NonNullable<Awaited<ReturnType<typeof requestUploadUrl>>>
+    export type RequestUploadUrlMutationBody = BodyType<UploadUrlRequest>
+    export type RequestUploadUrlMutationError = ErrorType<unknown>
+    export type RequestUploadUrlMutationVariables = {data: BodyType<UploadUrlRequest>}
+
+    /**
+ * @summary Request a private file upload URL
+ */
+export const useRequestUploadUrl = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUploadUrl>>, TError,RequestUploadUrlMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestUploadUrl>>,
+        TError,
+        RequestUploadUrlMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestUploadUrlMutationOptions(options));
+    }
+
+export const getGetStorageObjectUrl = (fileId: string,) => {
+
+
+
+
+  return `/api/storage/objects/${fileId}`
+}
+
+/**
+ * @summary Download a private workspace file
+ */
+export const getStorageObject = async (fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetStorageObjectUrl(fileId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStorageObjectQueryKey = (fileId: string,) => {
+    return [
+    `/api/storage/objects/${fileId}`
+    ] as const;
+    }
+
+
+export const getGetStorageObjectQueryOptions = <TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<unknown>>(fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStorageObjectQueryKey(fileId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStorageObject>>> = ({ signal }) => getStorageObject(fileId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: fileId !== null && fileId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStorageObjectQueryResult = NonNullable<Awaited<ReturnType<typeof getStorageObject>>>
+export type GetStorageObjectQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Download a private workspace file
+ */
+
+export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<unknown>>(
+ fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStorageObjectQueryOptions(fileId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -5,6 +5,7 @@
  * FlowBuilder workflow, request, team, and reporting API
  * OpenAPI spec version: 0.2.0
  */
+import type { FieldCondition } from './fieldCondition';
 import type { WorkflowFieldType } from './workflowFieldType';
 
 export interface WorkflowField {
@@ -15,4 +16,49 @@ export interface WorkflowField {
   /** @nullable */
   placeholder?: string | null;
   options?: string[];
+  /** @nullable */
+  key?: string | null;
+  /** @nullable */
+  helpText?: string | null;
+  readOnly?: boolean;
+  hidden?: boolean;
+  /** @nullable */
+  defaultValue?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 6
+     */
+  width?: number;
+  /** @nullable */
+  prefix?: string | null;
+  /** @nullable */
+  suffix?: string | null;
+  /** @nullable */
+  min?: number | null;
+  /** @nullable */
+  max?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  minLength?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  maxLength?: number | null;
+  multiple?: boolean;
+  /** @nullable */
+  accept?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  maxFiles?: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  maxFileSizeMB?: number;
+  displayCondition?: null | FieldCondition;
 }

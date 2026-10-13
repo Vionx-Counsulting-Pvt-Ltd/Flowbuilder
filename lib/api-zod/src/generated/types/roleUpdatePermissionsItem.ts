@@ -15,4 +15,5 @@ export const RoleUpdatePermissionsItem = {
   approve: 'approve',
   admin: 'admin',
   report: 'report',
+  build: 'build',
 } as const;

@@ -15,4 +15,5 @@ export const RoleInputPermissionsItem = {
   approve: 'approve',
   admin: 'admin',
   report: 'report',
+  build: 'build',
 } as const;

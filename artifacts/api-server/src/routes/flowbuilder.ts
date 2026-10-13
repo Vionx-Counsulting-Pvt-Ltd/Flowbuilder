@@ -18,6 +18,7 @@ import {
   GetWorkflowParams,
   GetWorkflowResponse,
   ListNotificationsResponse,
+  ListPeopleResponse,
   ListRequestsQueryParams,
   ListRequestsResponse,
   ListRolesResponse,
@@ -61,12 +62,14 @@ import {
   requireMember,
   type MemberContext,
 } from "../lib/flowbuilder-auth";
+import { ObjectStorageService } from "../lib/objectStorage";
 import type {
   WorkflowField,
   WorkflowStage,
 } from "@workspace/db";
 
 const router: IRouter = Router();
+const objectStorage = new ObjectStorageService();
 router.use(requireMember);
 
 type RequestRow = {
@@ -88,34 +91,70 @@ function groupedStages(stages: WorkflowStage[]): number[] {
 function workflowDefinitionError(
   fields: WorkflowField[],
   stages: WorkflowStage[],
+  requirePublish = false,
 ): string | null {
-  if (fields.length === 0) return "Add at least one request field.";
+  if (requirePublish && fields.length === 0) return "Add at least one request field.";
 
   const fieldIds = new Set<string>();
   const fieldLabels = new Set<string>();
+  const fieldKeys = new Set<string>();
   for (const field of fields) {
     const label = field.label.trim();
     if (!label) return "Every request field needs a label.";
+    if (!field.id.trim()) return `The field “${label}” needs a stable identifier.`;
     if (fieldIds.has(field.id)) return `The field “${label}” is duplicated.`;
     if (fieldLabels.has(label.toLowerCase())) {
       return `The field label “${label}” is used more than once.`;
     }
     fieldIds.add(field.id);
     fieldLabels.add(label.toLowerCase());
-    if (field.type === "select") {
+    if (field.key?.trim()) {
+      const normalizedKey = field.key.trim().toLowerCase();
+      if (fieldKeys.has(normalizedKey)) return `The field key “${field.key}” is duplicated.`;
+      fieldKeys.add(normalizedKey);
+    }
+    if (field.width !== undefined && (!Number.isInteger(field.width) || field.width < 1 || field.width > 6)) {
+      return `Set a valid width for “${label}”.`;
+    }
+    if (["select", "multiselect", "radio", "lookup"].includes(field.type)) {
       const options = (field.options ?? [])
         .map((option) => option.trim())
         .filter(Boolean);
-      if (options.length === 0) {
+      if (requirePublish && options.length === 0) {
         return `Add at least one option to “${label}”.`;
       }
       if (new Set(options.map((option) => option.toLowerCase())).size !== options.length) {
         return `Remove duplicate options from “${label}”.`;
       }
     }
+    if (
+      requirePublish &&
+      field.displayCondition &&
+      !fields.some((candidate) => candidate.id === field.displayCondition?.fieldId)
+    ) {
+      return `Choose an existing field for the display condition on “${label}”.`;
+    }
+    if (
+      field.min !== undefined &&
+      field.min !== null &&
+      field.max !== undefined &&
+      field.max !== null &&
+      field.min > field.max
+    ) {
+      return `The minimum for “${label}” must not exceed its maximum.`;
+    }
+    if (
+      field.minLength !== undefined &&
+      field.maxLength !== undefined &&
+      field.minLength !== null &&
+      field.maxLength !== null &&
+      field.minLength > field.maxLength
+    ) {
+      return `The minimum length for “${label}” must not exceed its maximum length.`;
+    }
   }
 
-  if (stages.length === 0) return "Add at least one approval stage.";
+  if (requirePublish && stages.length === 0) return "Add at least one approval stage.";
   for (const stage of stages) {
     if (!stage.name.trim()) return "Every approval stage needs a name.";
     if (!Number.isInteger(stage.slaHours) || stage.slaHours < 1) {
@@ -125,10 +164,10 @@ function workflowDefinitionError(
       return `Choose an owner for “${stage.name}”.`;
     }
     if (stage.conditionFieldId) {
-      if (!fieldIds.has(stage.conditionFieldId)) {
+      if (requirePublish && !fields.some((field) => field.id === stage.conditionFieldId)) {
         return `Choose an existing request field for the condition on “${stage.name}”.`;
       }
-      if (!stage.conditionValue?.trim()) {
+      if (requirePublish && !stage.conditionValue?.trim()) {
         return `Add a match value for the condition on “${stage.name}”.`;
       }
     }
@@ -136,16 +175,38 @@ function workflowDefinitionError(
   return null;
 }
 
+function isFieldVisible(
+  field: WorkflowField,
+  formData: Record<string, unknown>,
+): boolean {
+  if (field.hidden) return false;
+  const condition = field.displayCondition;
+  if (!condition) return true;
+  const currentValue = formData[condition.fieldId];
+  const matches = Array.isArray(currentValue)
+    ? currentValue.some((value) => String(value) === condition.value)
+    : String(currentValue ?? "") === condition.value;
+  if (condition.operator === "notEquals") return !matches;
+  if (condition.operator === "contains") {
+    return Array.isArray(currentValue)
+      ? matches
+      : String(currentValue ?? "").includes(condition.value);
+  }
+  return matches;
+}
+
 function formSubmissionError(
   fields: WorkflowField[],
   formData: Record<string, unknown>,
 ): string | null {
   for (const field of fields) {
+    if (!isFieldVisible(field, formData)) continue;
     const value = formData[field.id];
     const empty =
       value === undefined ||
       value === null ||
-      (typeof value === "string" && value.trim() === "");
+      (typeof value === "string" && value.trim() === "") ||
+      (Array.isArray(value) && value.length === 0);
     if (
       field.required &&
       (empty || (field.type === "checkbox" && value !== true))
@@ -158,6 +219,12 @@ function formSubmissionError(
       if (typeof value !== "string") {
         return `${field.label} must be text.`;
       }
+      if (field.minLength && value.length < field.minLength) {
+        return `${field.label} is too short.`;
+      }
+      if (field.maxLength && value.length > field.maxLength) {
+        return `${field.label} is too long.`;
+      }
     } else if (field.type === "number") {
       const numberValue =
         typeof value === "number"
@@ -167,6 +234,12 @@ function formSubmissionError(
             : Number.NaN;
       if (!Number.isFinite(numberValue)) {
         return `${field.label} must be a valid number.`;
+      }
+      if (field.min !== undefined && field.min !== null && numberValue < field.min) {
+        return `${field.label} must be at least ${field.min}.`;
+      }
+      if (field.max !== undefined && field.max !== null && numberValue > field.max) {
+        return `${field.label} must be no more than ${field.max}.`;
       }
     } else if (field.type === "date") {
       const date =
@@ -180,15 +253,66 @@ function formSubmissionError(
       ) {
         return `${field.label} must be a valid date.`;
       }
-    } else if (field.type === "select") {
+    } else if (field.type === "time") {
+      if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+        return `${field.label} must be a valid time.`;
+      }
+    } else if (field.type === "datetime") {
+      if (
+        typeof value !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ||
+        !Number.isFinite(new Date(value).valueOf())
+      ) {
+        return `${field.label} must be a valid date and time.`;
+      }
+    } else if (["select", "radio", "lookup"].includes(field.type)) {
       if (
         typeof value !== "string" ||
         !(field.options ?? []).includes(value)
       ) {
         return `Choose a valid option for ${field.label}.`;
       }
+    } else if (field.type === "multiselect") {
+      if (
+        !Array.isArray(value) ||
+        value.some((item) => typeof item !== "string" || !(field.options ?? []).includes(item))
+      ) {
+        return `Choose valid options for ${field.label}.`;
+      }
     } else if (field.type === "checkbox" && typeof value !== "boolean") {
       return `${field.label} must be checked or unchecked.`;
+    } else if (field.type === "people") {
+      const choices = Array.isArray(value) ? value : [value];
+      if (
+        (Array.isArray(value) && !field.multiple) ||
+        (!Array.isArray(value) && field.multiple) ||
+        choices.some((choice) => typeof choice !== "string")
+      ) {
+        return `Choose valid people for ${field.label}.`;
+      }
+    } else if (field.type === "file") {
+      const maxFiles = field.multiple ? field.maxFiles ?? 10 : 1;
+      if (
+        !Array.isArray(value) ||
+        value.length > maxFiles ||
+        (!field.multiple && value.length > 1) ||
+        value.some(
+          (file) =>
+            !file ||
+            typeof file !== "object" ||
+            typeof (file as { fileId?: unknown }).fileId !== "string" ||
+            !/^[0-9a-f-]{36}$/i.test((file as { fileId: string }).fileId) ||
+            typeof (file as { name?: unknown }).name !== "string" ||
+            typeof (file as { contentType?: unknown }).contentType !== "string" ||
+            typeof (file as { size?: unknown }).size !== "number",
+        )
+      ) {
+        return `Upload valid files for ${field.label}.`;
+      }
+      const maxBytes = (field.maxFileSizeMB ?? 20) * 1024 * 1024;
+      if (value.some((file) => (file as { size: number }).size > maxBytes)) {
+        return `A file for ${field.label} exceeds the allowed size.`;
+      }
     }
   }
   return null;
@@ -619,6 +743,7 @@ router.get("/workflows", async (_req, res): Promise<void> => {
         (workflow) =>
           workflow.status === "active" ||
           workflow.ownerUserId === member.id ||
+          hasPermission(member, "build") ||
           member.roleName === "Workflow Owner",
       );
   const result = await Promise.all(visible.map(workflowResponse));
@@ -627,7 +752,7 @@ router.get("/workflows", async (_req, res): Promise<void> => {
 
 router.post("/workflows", async (req, res): Promise<void> => {
   const member = currentMember(res);
-  if (!hasPermission(member, "admin") && member.roleName !== "Workflow Owner") {
+  if (!hasPermission(member, "build") && member.roleName !== "Workflow Owner") {
     res.status(403).json({ error: "You do not have permission to build workflows." });
     return;
   }
@@ -699,7 +824,7 @@ router.get("/workflows/:workflowId", async (req, res): Promise<void> => {
 
 router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
   const member = currentMember(res);
-  if (!hasPermission(member, "admin") && member.roleName !== "Workflow Owner") {
+  if (!hasPermission(member, "build") && member.roleName !== "Workflow Owner") {
     res.status(403).json({ error: "You do not have permission to edit workflows." });
     return;
   }
@@ -735,6 +860,7 @@ router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
     const definitionError = workflowDefinitionError(
       (parsed.data.fields as WorkflowField[] | undefined) ?? existing.fields,
       (parsed.data.stages as WorkflowStage[] | undefined) ?? existing.stages,
+      parsed.data.status === "active",
     );
     if (definitionError) {
       res.status(400).json({ error: definitionError });
@@ -813,19 +939,99 @@ router.post("/requests", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Active workflow not found." });
     return;
   }
-  const formError = formSubmissionError(
-    workflow.fields,
-    parsed.data.formData,
-  );
+  const submissionData: Record<string, unknown> = { ...parsed.data.formData };
+  for (const field of workflow.fields) {
+    if (field.readOnly) {
+      submissionData[field.id] =
+        field.type === "checkbox"
+          ? field.defaultValue === "true"
+          : field.defaultValue ?? "";
+    }
+  }
+  for (const field of workflow.fields) {
+    if (!isFieldVisible(field, submissionData)) delete submissionData[field.id];
+  }
+  const formError = formSubmissionError(workflow.fields, submissionData);
   if (formError) {
     res.status(400).json({ error: formError });
     return;
   }
+  const selectedPeople = new Set<string>();
+  for (const field of workflow.fields) {
+    if (field.type !== "people" || !isFieldVisible(field, submissionData)) continue;
+    const value = submissionData[field.id];
+    for (const id of Array.isArray(value) ? value : value ? [value] : []) {
+      if (typeof id === "string") selectedPeople.add(id);
+    }
+  }
+  if (selectedPeople.size > 0) {
+    const activePeople = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.tenantId, member.tenantId),
+          eq(usersTable.status, "active"),
+          inArray(usersTable.id, [...selectedPeople]),
+        ),
+      );
+    if (activePeople.length !== selectedPeople.size) {
+      res.status(400).json({ error: "Choose active people from this workspace." });
+      return;
+    }
+  }
+  for (const field of workflow.fields) {
+    if (field.type !== "file" || !isFieldVisible(field, submissionData)) continue;
+    const files = submissionData[field.id] as Array<{
+      fileId: string;
+      name: string;
+      contentType: string;
+      size: number;
+    }> | undefined;
+    for (const uploaded of files ?? []) {
+      const storedFile = await objectStorage.getTenantFile(member.tenantId, uploaded.fileId);
+      if (!storedFile) {
+        res.status(400).json({ error: `A file for ${field.label} could not be found.` });
+        return;
+      }
+      const [metadata] = await storedFile.getMetadata();
+      const actualSize = Number(metadata.size);
+      const actualType = String(metadata.contentType ?? uploaded.contentType);
+      if (
+        !Number.isFinite(actualSize) ||
+        actualSize > (field.maxFileSizeMB ?? 20) * 1024 * 1024
+      ) {
+        res.status(400).json({ error: `A file for ${field.label} exceeds the allowed size.` });
+        return;
+      }
+      const acceptedTypes = (field.accept ?? "")
+        .split(",")
+        .map((type) => type.trim().toLowerCase())
+        .filter(Boolean);
+      if (
+        acceptedTypes.length > 0 &&
+        !acceptedTypes.some((accepted) =>
+          accepted.startsWith(".")
+            ? uploaded.name.toLowerCase().endsWith(accepted)
+            : accepted.endsWith("/*")
+              ? actualType.toLowerCase().startsWith(accepted.slice(0, -1))
+              : actualType.toLowerCase() === accepted,
+        )
+      ) {
+        res.status(400).json({ error: `A file for ${field.label} has an unsupported type.` });
+        return;
+      }
+      uploaded.size = actualSize;
+      uploaded.contentType = actualType;
+    }
+  }
   let eligibleStages = workflow.stages.filter((stage) => {
     if (!stage.conditionFieldId) return true;
+    const conditionValue = submissionData[stage.conditionFieldId];
     return (
-      String(parsed.data.formData[stage.conditionFieldId] ?? "") ===
-      String(stage.conditionValue ?? "")
+      (Array.isArray(conditionValue)
+        ? conditionValue.some((value) => String(value) === String(stage.conditionValue ?? ""))
+        : String(conditionValue ?? "") === String(stage.conditionValue ?? ""))
     );
   });
   if (workflow.routing === "parallel" && eligibleStages.length > 0) {
@@ -862,7 +1068,7 @@ router.post("/requests", async (req, res): Promise<void> => {
       assignedUserId: target.assignedUserId,
       assignedRoleId: target.assignedRoleId,
       dueAt: new Date(createdAt.getTime() + dueHours * 60 * 60 * 1000),
-      formData: parsed.data.formData,
+      formData: submissionData,
       fieldsSnapshot: workflow.fields,
       stagesSnapshot: eligibleStages,
       approvedStageIds: [],
@@ -1153,9 +1359,24 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
   res.json(ActOnRequestResponse.parse(detail));
 });
 
+router.get("/people", async (_req, res): Promise<void> => {
+  const member = currentMember(res);
+  const people = await db
+    .select({ id: usersTable.id, name: usersTable.name })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.tenantId, member.tenantId),
+        eq(usersTable.status, "active"),
+      ),
+    )
+    .orderBy(usersTable.name);
+  res.json(ListPeopleResponse.parse(people));
+});
+
 router.get("/users", async (_req, res): Promise<void> => {
   const member = currentMember(res);
-  if (!hasPermission(member, "admin") && member.roleName !== "Workflow Owner") {
+  if (!hasPermission(member, "build") && member.roleName !== "Workflow Owner") {
     res.status(403).json({ error: "You do not have access to the workspace directory." });
     return;
   }
@@ -1407,7 +1628,7 @@ router.patch("/users/:userId", async (req, res): Promise<void> => {
 
 router.get("/roles", async (_req, res): Promise<void> => {
   const member = currentMember(res);
-  if (!hasPermission(member, "admin") && member.roleName !== "Workflow Owner") {
+  if (!hasPermission(member, "build") && member.roleName !== "Workflow Owner") {
     res.status(403).json({ error: "You do not have access to workspace roles." });
     return;
   }

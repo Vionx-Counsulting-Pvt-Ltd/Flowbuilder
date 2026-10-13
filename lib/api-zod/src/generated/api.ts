@@ -81,6 +81,16 @@ export const GetDashboardResponse = zod.object({
 /**
  * @summary List workflows available in the current workspace
  */
+export const listWorkflowsResponseFieldsItemWidthMax = 6;
+
+export const listWorkflowsResponseFieldsItemMinLengthMin = 0;
+
+export const listWorkflowsResponseFieldsItemMaxLengthMin = 0;
+
+export const listWorkflowsResponseFieldsItemMaxFilesMax = 10;
+
+export const listWorkflowsResponseFieldsItemMaxFileSizeMBMax = 25;
+
 
 
 
@@ -95,10 +105,31 @@ export const ListWorkflowsResponseItem = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(listWorkflowsResponseFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(listWorkflowsResponseFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(listWorkflowsResponseFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(listWorkflowsResponseFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(listWorkflowsResponseFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -125,6 +156,16 @@ export const ListWorkflowsResponse = zod.array(ListWorkflowsResponseItem)
  */
 export const createWorkflowBodyNameMin = 2;
 
+export const createWorkflowBodyFieldsItemWidthMax = 6;
+
+export const createWorkflowBodyFieldsItemMinLengthMin = 0;
+
+export const createWorkflowBodyFieldsItemMaxLengthMin = 0;
+
+export const createWorkflowBodyFieldsItemMaxFilesMax = 10;
+
+export const createWorkflowBodyFieldsItemMaxFileSizeMBMax = 25;
+
 
 
 
@@ -137,10 +178,31 @@ export const CreateWorkflowBody = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(createWorkflowBodyFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(createWorkflowBodyFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(createWorkflowBodyFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(createWorkflowBodyFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(createWorkflowBodyFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -154,6 +216,16 @@ export const CreateWorkflowBody = zod.object({
   "conditionValue": zod.string().nullish()
 })).min(1)
 })
+
+export const createWorkflowResponseFieldsItemWidthMax = 6;
+
+export const createWorkflowResponseFieldsItemMinLengthMin = 0;
+
+export const createWorkflowResponseFieldsItemMaxLengthMin = 0;
+
+export const createWorkflowResponseFieldsItemMaxFilesMax = 10;
+
+export const createWorkflowResponseFieldsItemMaxFileSizeMBMax = 25;
 
 
 
@@ -169,10 +241,31 @@ export const CreateWorkflowResponse = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(createWorkflowResponseFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(createWorkflowResponseFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(createWorkflowResponseFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(createWorkflowResponseFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(createWorkflowResponseFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -200,6 +293,16 @@ export const GetWorkflowParams = zod.object({
   "workflowId": zod.coerce.string()
 })
 
+export const getWorkflowResponseFieldsItemWidthMax = 6;
+
+export const getWorkflowResponseFieldsItemMinLengthMin = 0;
+
+export const getWorkflowResponseFieldsItemMaxLengthMin = 0;
+
+export const getWorkflowResponseFieldsItemMaxFilesMax = 10;
+
+export const getWorkflowResponseFieldsItemMaxFileSizeMBMax = 25;
+
 
 
 
@@ -214,10 +317,31 @@ export const GetWorkflowResponse = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(getWorkflowResponseFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(getWorkflowResponseFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(getWorkflowResponseFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(getWorkflowResponseFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(getWorkflowResponseFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -247,6 +371,16 @@ export const UpdateWorkflowParams = zod.object({
 
 export const updateWorkflowBodyNameMin = 2;
 
+export const updateWorkflowBodyFieldsItemWidthMax = 6;
+
+export const updateWorkflowBodyFieldsItemMinLengthMin = 0;
+
+export const updateWorkflowBodyFieldsItemMaxLengthMin = 0;
+
+export const updateWorkflowBodyFieldsItemMaxFilesMax = 10;
+
+export const updateWorkflowBodyFieldsItemMaxFileSizeMBMax = 25;
+
 
 
 
@@ -260,10 +394,31 @@ export const UpdateWorkflowBody = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(updateWorkflowBodyFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(updateWorkflowBodyFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(updateWorkflowBodyFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(updateWorkflowBodyFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(updateWorkflowBodyFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })).optional(),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -277,6 +432,16 @@ export const UpdateWorkflowBody = zod.object({
   "conditionValue": zod.string().nullish()
 })).min(1).optional()
 })
+
+export const updateWorkflowResponseFieldsItemWidthMax = 6;
+
+export const updateWorkflowResponseFieldsItemMinLengthMin = 0;
+
+export const updateWorkflowResponseFieldsItemMaxLengthMin = 0;
+
+export const updateWorkflowResponseFieldsItemMaxFilesMax = 10;
+
+export const updateWorkflowResponseFieldsItemMaxFileSizeMBMax = 25;
 
 
 
@@ -292,10 +457,31 @@ export const UpdateWorkflowResponse = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(updateWorkflowResponseFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(updateWorkflowResponseFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(updateWorkflowResponseFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(updateWorkflowResponseFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(updateWorkflowResponseFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -350,6 +536,16 @@ export const CreateRequestBody = zod.object({
   "formData": zod.record(zod.string(), zod.unknown())
 })
 
+export const createRequestResponseTwoFieldsItemWidthMax = 6;
+
+export const createRequestResponseTwoFieldsItemMinLengthMin = 0;
+
+export const createRequestResponseTwoFieldsItemMaxLengthMin = 0;
+
+export const createRequestResponseTwoFieldsItemMaxFilesMax = 10;
+
+export const createRequestResponseTwoFieldsItemMaxFileSizeMBMax = 25;
+
 
 
 
@@ -372,10 +568,31 @@ export const CreateRequestResponse = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(createRequestResponseTwoFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(createRequestResponseTwoFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(createRequestResponseTwoFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(createRequestResponseTwoFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(createRequestResponseTwoFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -405,6 +622,16 @@ export const GetRequestParams = zod.object({
   "requestId": zod.coerce.number().int()
 })
 
+export const getRequestResponseTwoFieldsItemWidthMax = 6;
+
+export const getRequestResponseTwoFieldsItemMinLengthMin = 0;
+
+export const getRequestResponseTwoFieldsItemMaxLengthMin = 0;
+
+export const getRequestResponseTwoFieldsItemMaxFilesMax = 10;
+
+export const getRequestResponseTwoFieldsItemMaxFileSizeMBMax = 25;
+
 
 
 
@@ -427,10 +654,31 @@ export const GetRequestResponse = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(getRequestResponseTwoFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(getRequestResponseTwoFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(getRequestResponseTwoFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(getRequestResponseTwoFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(getRequestResponseTwoFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -465,6 +713,16 @@ export const ActOnRequestBody = zod.object({
   "comment": zod.string().nullish()
 })
 
+export const actOnRequestResponseTwoFieldsItemWidthMax = 6;
+
+export const actOnRequestResponseTwoFieldsItemMinLengthMin = 0;
+
+export const actOnRequestResponseTwoFieldsItemMaxLengthMin = 0;
+
+export const actOnRequestResponseTwoFieldsItemMaxFilesMax = 10;
+
+export const actOnRequestResponseTwoFieldsItemMaxFileSizeMBMax = 25;
+
 
 
 
@@ -487,10 +745,31 @@ export const ActOnRequestResponse = zod.object({
   "fields": zod.array(zod.object({
   "id": zod.string(),
   "label": zod.string(),
-  "type": zod.enum(['text', 'number', 'date', 'select', 'textarea', 'checkbox']),
+  "type": zod.enum(['text', 'textarea', 'number', 'date', 'time', 'datetime', 'select', 'multiselect', 'checkbox', 'radio', 'file', 'people', 'lookup']),
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
-  "options": zod.array(zod.string()).optional()
+  "options": zod.array(zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(actOnRequestResponseTwoFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(actOnRequestResponseTwoFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(actOnRequestResponseTwoFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(actOnRequestResponseTwoFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(actOnRequestResponseTwoFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
 })),
   "stages": zod.array(zod.object({
   "id": zod.string(),
@@ -555,6 +834,16 @@ export const CreateUserResponse = zod.object({
 
 
 /**
+ * @summary List active workspace people for workflow fields
+ */
+export const ListPeopleResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string()
+})
+export const ListPeopleResponse = zod.array(ListPeopleResponseItem)
+
+
+/**
  * @summary Update a member's role or active status
  */
 export const UpdateUserParams = zod.object({
@@ -590,7 +879,7 @@ export const ListRolesResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "description": zod.string(),
-  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report'])),
+  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report', 'build'])),
   "memberCount": zod.number().int(),
   "isDefault": zod.boolean()
 })
@@ -607,14 +896,14 @@ export const createRoleBodyNameMin = 2;
 export const CreateRoleBody = zod.object({
   "name": zod.string().min(createRoleBodyNameMin),
   "description": zod.string(),
-  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report']))
+  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report', 'build']))
 })
 
 export const CreateRoleResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "description": zod.string(),
-  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report'])),
+  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report', 'build'])),
   "memberCount": zod.number().int(),
   "isDefault": zod.boolean()
 })
@@ -634,14 +923,14 @@ export const updateRoleBodyNameMin = 2;
 export const UpdateRoleBody = zod.object({
   "name": zod.string().min(updateRoleBodyNameMin).optional(),
   "description": zod.string().optional(),
-  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report'])).optional()
+  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report', 'build'])).optional()
 })
 
 export const UpdateRoleResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "description": zod.string(),
-  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report'])),
+  "permissions": zod.array(zod.enum(['view', 'create', 'approve', 'admin', 'report', 'build'])),
   "memberCount": zod.number().int(),
   "isDefault": zod.boolean()
 })
@@ -698,5 +987,51 @@ export const GetReportOverviewResponse = zod.object({
   "completed": zod.number().int()
 }))
 })
+
+
+/**
+ * @summary Request a private file upload URL
+ */
+export const requestUploadUrlBodyNameMax = 255;
+
+export const requestUploadUrlBodySizeMax = 26214400;
+
+export const requestUploadUrlBodyContentTypeMax = 255;
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1).max(requestUploadUrlBodyNameMax),
+  "size": zod.number().int().min(1).max(requestUploadUrlBodySizeMax),
+  "contentType": zod.string().min(1).max(requestUploadUrlBodyContentTypeMax)
+})
+
+export const requestUploadUrlResponseMetadataNameMax = 255;
+
+export const requestUploadUrlResponseMetadataSizeMax = 26214400;
+
+export const requestUploadUrlResponseMetadataContentTypeMax = 255;
+
+
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().url(),
+  "fileId": zod.string().uuid(),
+  "metadata": zod.object({
+  "name": zod.string().min(1).max(requestUploadUrlResponseMetadataNameMax),
+  "size": zod.number().int().min(1).max(requestUploadUrlResponseMetadataSizeMax),
+  "contentType": zod.string().min(1).max(requestUploadUrlResponseMetadataContentTypeMax)
+})
+})
+
+
+/**
+ * @summary Download a private workspace file
+ */
+export const GetStorageObjectParams = zod.object({
+  "fileId": zod.coerce.string().uuid()
+})
+
+export const GetStorageObjectResponse = zod.unknown()
 
 

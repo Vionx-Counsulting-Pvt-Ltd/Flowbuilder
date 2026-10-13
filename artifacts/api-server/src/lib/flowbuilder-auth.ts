@@ -31,12 +31,17 @@ const defaultRoleDefinitions = [
   {
     name: "Company Admin",
     description: "Manage workspace users, workflows, requests, and reports.",
-    permissions: ["view", "create", "approve", "admin", "report"] as const,
+    permissions: ["view", "create", "approve", "admin", "report", "build"] as const,
   },
   {
     name: "Workflow Owner",
     description: "Build workflows and action assigned requests.",
-    permissions: ["view", "create", "approve", "report"] as const,
+    permissions: ["view", "create", "approve", "report", "build"] as const,
+  },
+  {
+    name: "Developer",
+    description: "Build, preview, and publish workflow forms.",
+    permissions: ["view", "create", "build"] as const,
   },
   {
     name: "Approver",

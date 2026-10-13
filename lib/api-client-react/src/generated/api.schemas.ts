@@ -44,12 +44,34 @@ export type WorkflowFieldType = typeof WorkflowFieldType[keyof typeof WorkflowFi
 
 export const WorkflowFieldType = {
   text: 'text',
+  textarea: 'textarea',
   number: 'number',
   date: 'date',
+  time: 'time',
+  datetime: 'datetime',
   select: 'select',
-  textarea: 'textarea',
+  multiselect: 'multiselect',
   checkbox: 'checkbox',
+  radio: 'radio',
+  file: 'file',
+  people: 'people',
+  lookup: 'lookup',
 } as const;
+
+export type FieldConditionOperator = typeof FieldConditionOperator[keyof typeof FieldConditionOperator];
+
+
+export const FieldConditionOperator = {
+  equals: 'equals',
+  notEquals: 'notEquals',
+  contains: 'contains',
+} as const;
+
+export interface FieldCondition {
+  fieldId: string;
+  operator: FieldConditionOperator;
+  value: string;
+}
 
 export interface WorkflowField {
   id: string;
@@ -59,6 +81,51 @@ export interface WorkflowField {
   /** @nullable */
   placeholder?: string | null;
   options?: string[];
+  /** @nullable */
+  key?: string | null;
+  /** @nullable */
+  helpText?: string | null;
+  readOnly?: boolean;
+  hidden?: boolean;
+  /** @nullable */
+  defaultValue?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 6
+     */
+  width?: number;
+  /** @nullable */
+  prefix?: string | null;
+  /** @nullable */
+  suffix?: string | null;
+  /** @nullable */
+  min?: number | null;
+  /** @nullable */
+  max?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  minLength?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  maxLength?: number | null;
+  multiple?: boolean;
+  /** @nullable */
+  accept?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  maxFiles?: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  maxFileSizeMB?: number;
+  displayCondition?: null | FieldCondition;
 }
 
 export type WorkflowStageAssigneeType = typeof WorkflowStageAssigneeType[keyof typeof WorkflowStageAssigneeType];
@@ -284,6 +351,7 @@ export const WorkspaceRolePermissionsItem = {
   approve: 'approve',
   admin: 'admin',
   report: 'report',
+  build: 'build',
 } as const;
 
 export interface WorkspaceRole {
@@ -304,6 +372,7 @@ export const RoleInputPermissionsItem = {
   approve: 'approve',
   admin: 'admin',
   report: 'report',
+  build: 'build',
 } as const;
 
 export interface RoleInput {
@@ -322,6 +391,7 @@ export const RoleUpdatePermissionsItem = {
   approve: 'approve',
   admin: 'admin',
   report: 'report',
+  build: 'build',
 } as const;
 
 export interface RoleUpdate {
@@ -329,6 +399,35 @@ export interface RoleUpdate {
   name?: string;
   description?: string;
   permissions?: RoleUpdatePermissionsItem[];
+}
+
+export interface PersonOption {
+  id: string;
+  name: string;
+}
+
+export interface UploadUrlRequest {
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  name: string;
+  /**
+     * @minimum 1
+     * @maximum 26214400
+     */
+  size: number;
+  /**
+     * @minLength 1
+     * @maxLength 255
+     */
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  uploadURL: string;
+  fileId: string;
+  metadata: UploadUrlRequest;
 }
 
 export interface Notification {
