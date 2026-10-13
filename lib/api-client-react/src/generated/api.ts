@@ -22,6 +22,7 @@ import type {
 import type {
   CurrentUser,
   DashboardSummary,
+  GetStorageObjectParams,
   HealthStatus,
   ListRequestsParams,
   Notification,
@@ -2617,20 +2618,29 @@ export const useRequestUploadUrl = <TError = ErrorType<unknown>,
       return useMutation(getRequestUploadUrlMutationOptions(options));
     }
 
-export const getGetStorageObjectUrl = (fileId: string,) => {
+export const getGetStorageObjectUrl = (fileId: string,
+    params?: GetStorageObjectParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/storage/objects/${fileId}`
+  return stringifiedParams.length > 0 ? `/api/storage/objects/${fileId}?${stringifiedParams}` : `/api/storage/objects/${fileId}`
 }
 
 /**
- * @summary Download a private workspace file
+ * @summary View or download a private workspace file
  */
-export const getStorageObject = async (fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+export const getStorageObject = async (fileId: string,
+    params?: GetStorageObjectParams, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
 
-  return customFetch<Blob>(getGetStorageObjectUrl(fileId),
+  return customFetch<Blob>(getGetStorageObjectUrl(fileId,params),
   {
     ...options,
     method: 'GET'
@@ -2643,23 +2653,25 @@ export const getStorageObject = async (fileId: string, options?: Parameters<type
 
 
 
-export const getGetStorageObjectQueryKey = (fileId: string,) => {
+export const getGetStorageObjectQueryKey = (fileId: string,
+    params?: GetStorageObjectParams,) => {
     return [
-    `/api/storage/objects/${fileId}`
+    `/api/storage/objects/${fileId}`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetStorageObjectQueryOptions = <TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<unknown>>(fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetStorageObjectQueryOptions = <TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<unknown>>(fileId: string,
+    params?: GetStorageObjectParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStorageObjectQueryKey(fileId);
+  const queryKey =  queryOptions?.queryKey ?? getGetStorageObjectQueryKey(fileId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStorageObject>>> = ({ signal }) => getStorageObject(fileId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStorageObject>>> = ({ signal }) => getStorageObject(fileId,params, { signal, ...requestOptions });
 
 
 
@@ -2673,15 +2685,16 @@ export type GetStorageObjectQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Download a private workspace file
+ * @summary View or download a private workspace file
  */
 
 export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorageObject>>, TError = ErrorType<unknown>>(
- fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ fileId: string,
+    params?: GetStorageObjectParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorageObject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetStorageObjectQueryOptions(fileId,options)
+  const queryOptions = getGetStorageObjectQueryOptions(fileId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

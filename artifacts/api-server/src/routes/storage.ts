@@ -2,6 +2,7 @@ import { RequestUploadUrlBody, RequestUploadUrlResponse } from "@workspace/api-z
 import { Router, type IRouter } from "express";
 import { currentMember, hasPermission, requireMember } from "../lib/flowbuilder-auth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { fileDeliveryHeaders } from "../lib/file-delivery";
 
 const router: IRouter = Router();
 const storage = new ObjectStorageService();
@@ -58,11 +59,13 @@ router.get(
         return;
       }
       const [metadata] = await file.getMetadata();
-      res.setHeader(
-        "Content-Type",
-        (metadata.contentType as string) || "application/octet-stream",
+      const headers = fileDeliveryHeaders(
+        metadata.contentType,
+        req.query.preview === "true",
+        typeof req.query.filename === "string" ? req.query.filename : undefined,
       );
-      res.setHeader("Content-Disposition", 'attachment; filename="FlowBuilder-upload"');
+      res.setHeader("Content-Type", headers.contentType);
+      res.setHeader("Content-Disposition", headers.contentDisposition);
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Cache-Control", "private, no-store");
       file.createReadStream().on("error", (error) => {

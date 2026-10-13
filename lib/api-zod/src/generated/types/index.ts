@@ -12,6 +12,7 @@ export * from './dashboardSummary';
 export * from './dashboardTask';
 export * from './fieldCondition';
 export * from './fieldConditionOperator';
+export * from './getStorageObjectParams';
 export * from './healthStatus';
 export * from './listRequestsParams';
 export * from './myWorkflow';

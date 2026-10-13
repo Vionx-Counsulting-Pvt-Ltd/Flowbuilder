@@ -532,12 +532,20 @@ paths:
     get:
       operationId: getStorageObject
       tags: [storage]
-      summary: Download a private workspace file
+      summary: View or download a private workspace file
       parameters:
         - name: fileId
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: preview
+          in: query
+          description: Open supported PDFs, raster images and plain text inline; other types remain downloads.
+          schema: { type: boolean, default: false }
+        - name: filename
+          in: query
+          description: Original filename to use for delivery, sanitized by the server.
+          schema: { type: string }
       responses:
         "200":
           description: Private file contents

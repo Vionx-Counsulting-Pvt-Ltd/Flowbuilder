@@ -1506,10 +1506,17 @@ export const RequestUploadUrlResponse = zod.object({
 
 
 /**
- * @summary Download a private workspace file
+ * @summary View or download a private workspace file
  */
 export const GetStorageObjectParams = zod.object({
   "fileId": zod.coerce.string().uuid()
+})
+
+export const getStorageObjectQueryPreviewDefault = false;
+
+export const GetStorageObjectQueryParams = zod.object({
+  "preview": zod.coerce.boolean().default(getStorageObjectQueryPreviewDefault).describe('Open supported PDFs, raster images and plain text inline; other types remain downloads.'),
+  "filename": zod.coerce.string().optional().describe('Original filename to use for delivery, sanitized by the server.')
 })
 
 export const GetStorageObjectResponse = zod.unknown()

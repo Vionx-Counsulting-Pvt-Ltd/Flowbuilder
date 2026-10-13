@@ -657,3 +657,14 @@ status?: RequestStatus;
 search?: string;
 };
 
+export type GetStorageObjectParams = {
+/**
+ * Open supported PDFs, raster images and plain text inline; other types remain downloads.
+ */
+preview?: boolean;
+/**
+ * Original filename to use for delivery, sanitized by the server.
+ */
+filename?: string;
+};
+

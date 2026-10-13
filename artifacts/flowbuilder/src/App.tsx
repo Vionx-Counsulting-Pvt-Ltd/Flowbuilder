@@ -25,6 +25,7 @@ import type {
 import WorkflowEditor from './WorkflowEditor';
 import VionxLanding from './pages/VionxLanding';
 import RequestFormModal from './components/RequestFormModal';
+import RequestAttachments from './components/RequestAttachments';
 import TablesPage from './pages/TablesPage';
 import BulkUserImport from './BulkUserImport';
 import PlatformAdminPage from './PlatformAdminPage';
@@ -416,9 +417,8 @@ function RequestsPage() {
 }
 
 function SubmittedFieldValue({ field, value, people }: { field: WorkflowField; value: unknown; people: Array<{ id: string; name: string }> }) {
-  if (field.type === 'file') {
-    const files = Array.isArray(value) ? value as Array<{ fileId: string; name: string }> : [];
-    return files.length ? <div className="flex flex-col gap-1">{files.map(file => <a key={file.fileId} className="text-link" href={`${basePath}/api/storage/objects/${file.fileId}`} target="_blank" rel="noreferrer" data-testid={`link-request-file-${file.fileId}`}>{file.name}</a>)}</div> : <>—</>;
+  if (['file', 'image', 'thumbnail', 'drawing', 'signature'].includes(field.type)) {
+    return <RequestAttachments value={value} />;
   }
   if (field.type === 'people') {
     const ids = Array.isArray(value) ? value : value ? [value] : [];
