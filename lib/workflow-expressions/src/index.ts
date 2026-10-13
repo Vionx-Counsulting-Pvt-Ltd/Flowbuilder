@@ -52,12 +52,31 @@ export const expressionFunctions: ExpressionFunction[] = [
   { name: "ANY", signature: "ANY(list)", description: "Return the first value in a list.", example: "ANY([Reviewers])" },
   { name: "INDEX", signature: "INDEX(list, position)", description: "Get one value from a list (positions start at 1).", example: "INDEX([Reviewers], 1)" },
   { name: "UNIQUE", signature: "UNIQUE(list)", description: "Remove repeated values from a list.", example: "UNIQUE([Tags])" },
+  { name: "INTERSECT", signature: "INTERSECT(list1, list2)", description: "Return values present in both lists.", example: 'INTERSECT([Selected teams], LIST("Finance", "People"))' },
+  { name: "SORT", signature: "SORT(list, [descending])", description: "Return a sorted copy of a list.", example: "SORT([Scores], TRUE)" },
+  { name: "TOP", signature: "TOP(list, how_many)", description: "Return the first requested values from a list.", example: "TOP(SORT([Scores], TRUE), 3)" },
   { name: "SPLIT", signature: "SPLIT(text, delimiter)", description: "Split text into a list.", example: 'SPLIT([Emails], ",")' },
   { name: "CONCATENATE", signature: "CONCATENATE(value, ...)", description: "Join values into text.", example: 'CONCATENATE([First name], " ", [Last name])' },
+  { name: "DOMAINOF", signature: "DOMAINOF(email)", description: "Extract the domain from an email address.", example: "DOMAINOF([Work email])" },
+  { name: "ENCODEURL", signature: "ENCODEURL(text)", description: "Encode text for use in a URL.", example: 'ENCODEURL([Search terms])' },
+  { name: "FIND", signature: "FIND(search_for, text_to_search)", description: "Return the 1-based position of text, or 0 if it is absent.", example: 'FIND("@", [Email])' },
+  { name: "INITIALS", signature: "INITIALS(text)", description: "Return the first letter of each word.", example: "INITIALS([Requester])" },
+  { name: "MID", signature: "MID(text, begin_at, length)", description: "Return a section of text using a 1-based start position.", example: "MID([Reference], 4, 6)" },
+  { name: "SUBSTITUTE", signature: "SUBSTITUTE(text, search_for, replace_with)", description: "Replace every occurrence of a text fragment.", example: 'SUBSTITUTE([Phone], "-", "")' },
   { name: "TEXT", signature: "TEXT(value)", description: "Convert a value to text.", example: 'TEXT([Amount])' },
   { name: "NUMBER", signature: "NUMBER(value)", description: "Convert a value to a number.", example: "NUMBER([Quantity])" },
   { name: "DECIMAL", signature: "DECIMAL(value)", description: "Convert a value to a decimal number.", example: "DECIMAL([Rate])" },
   { name: "ROUND", signature: "ROUND(number, digits)", description: "Round a number.", example: "ROUND([Amount], 2)" },
+  { name: "AVERAGE", signature: "AVERAGE(list)", description: "Return the arithmetic mean of a list of numbers.", example: "AVERAGE([Scores])" },
+  { name: "CEILING", signature: "CEILING(number)", description: "Round a number up to the nearest integer.", example: "CEILING([Amount])" },
+  { name: "FLOOR", signature: "FLOOR(number)", description: "Round a number down to the nearest integer.", example: "FLOOR([Amount])" },
+  { name: "LN", signature: "LN(number)", description: "Return the natural logarithm of a positive number.", example: "LN([Amount])" },
+  { name: "LOG", signature: "LOG(number, [base])", description: "Return a logarithm using the specified base, or base 10.", example: "LOG([Amount], 2)" },
+  { name: "LOG2", signature: "LOG2(number)", description: "Return the base-2 logarithm of a positive number.", example: "LOG2([Amount])" },
+  { name: "LOG10", signature: "LOG10(number)", description: "Return the base-10 logarithm of a positive number.", example: "LOG10([Amount])" },
+  { name: "MOD", signature: "MOD(dividend, divisor)", description: "Return the remainder with the dividend's sign.", example: "MOD([Minutes], 60)" },
+  { name: "POWER", signature: "POWER(number, exponent)", description: "Raise a number to a power.", example: "POWER([Quantity], 2)" },
+  { name: "SQRT", signature: "SQRT(number)", description: "Return the square root of a non-negative number.", example: "SQRT([Area])" },
   { name: "ABS", signature: "ABS(number)", description: "Return the absolute value.", example: "ABS([Balance])" },
   { name: "SUM", signature: "SUM(list)", description: "Add the numbers in a list.", example: "SUM([Line totals])" },
   { name: "MIN", signature: "MIN(list)", description: "Return the smallest number in a list.", example: "MIN(LIST([Estimate], 1000))" },
@@ -354,15 +373,18 @@ function walk(node: Node, visit: (node: Node) => void): void {
 function arityError(name: string, count: number): string | null {
   const exact: Record<string, number[]> = {
     IF: [3], NOT: [1], ISBLANK: [1], ISNOTBLANK: [1], IN: [2], CONTAINS: [2],
-    COUNT: [1], ANY: [1], INDEX: [2], UNIQUE: [1], SPLIT: [2], TEXT: [1],
-    NUMBER: [1], DECIMAL: [1], ABS: [1], SUM: [1], MIN: [1], MAX: [1],
+    COUNT: [1], ANY: [1], INDEX: [2], UNIQUE: [1], INTERSECT: [2], TOP: [2], SPLIT: [2], TEXT: [1],
+    DOMAINOF: [1], ENCODEURL: [1], FIND: [2], INITIALS: [1], MID: [3], SUBSTITUTE: [3],
+    NUMBER: [1], DECIMAL: [1], ABS: [1], AVERAGE: [1], CEILING: [1], FLOOR: [1],
+    LN: [1], LOG2: [1], LOG10: [1], MOD: [2], POWER: [2], SQRT: [1],
+    SUM: [1], MIN: [1], MAX: [1],
     TODAY: [0], NOW: [0], DATE: [1], DATETIME: [1], TIME: [1],
     YEAR: [1], MONTH: [1], DAY: [1], LOWER: [1], UPPER: [1], TRIM: [1],
     LEN: [1], LAT: [1], LONG: [1], USEREMAIL: [0], USERNAME: [0], USERROLE: [0],
   };
   const ranged: Record<string, [number, number]> = {
     AND: [2, 64], OR: [2, 64], IFS: [2, 64], SWITCH: [3, 64], LIST: [0, 64],
-    CONCATENATE: [1, 64], ROUND: [1, 2], LEFT: [1, 2], RIGHT: [1, 2],
+    CONCATENATE: [1, 64], ROUND: [1, 2], LOG: [1, 2], SORT: [1, 2], LEFT: [1, 2], RIGHT: [1, 2],
     STARTSWITH: [2, 2], ENDSWITH: [2, 2], LATLONG: [2, 2],
   };
   if (exact[name]) return exact[name].includes(count) ? null : `${name} expects ${exact[name].join(" or ")} argument${exact[name].length === 1 && exact[name][0] === 1 ? "" : "s"}.`;
@@ -558,6 +580,10 @@ function evaluateNode(node: Node, context: ExpressionContext, depth = 0): unknow
   }
   const args = node.args.map((item) => evaluateNode(item, context, depth + 1));
   const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [value];
+  const finiteResult = (value: number, functionName: string): number => {
+    if (!Number.isFinite(value)) throw new ExpressionError(`${functionName} needs a result within the supported numeric range.`);
+    return value;
+  };
   const now = context.now ?? new Date();
   switch (name) {
     case "ISBLANK": return isBlank(args[0]);
@@ -572,8 +598,46 @@ function evaluateNode(node: Node, context: ExpressionContext, depth = 0): unknow
       return list(args[0])[index] ?? null;
     }
     case "UNIQUE": return [...new Map(list(args[0]).map((value) => [text(value).toLocaleLowerCase(), value])).values()];
+    case "INTERSECT": {
+      const second = list(args[1]);
+      return [...new Map(list(args[0])
+        .filter((value) => second.some((candidate) => equal(value, candidate)))
+        .map((value) => [text(value).toLocaleLowerCase(), value])).values()];
+    }
+    case "SORT": {
+      const descending = truthy(args[1] ?? false);
+      return [...list(args[0])].sort((left, right) => {
+        let order = 0;
+        if (typeof left === "number" && typeof right === "number") order = left - right;
+        else order = text(left).localeCompare(text(right), undefined, { sensitivity: "base", numeric: true });
+        return descending ? -order : order;
+      });
+    }
+    case "TOP": return list(args[0]).slice(0, Math.max(0, Math.trunc(numeric(args[1], "TOP"))));
     case "SPLIT": return text(args[0]).split(text(args[1])).map((value) => value.trim()).filter(Boolean);
     case "CONCATENATE": return args.map(text).join("");
+    case "DOMAINOF": {
+      const email = text(args[0]).trim();
+      const at = email.lastIndexOf("@");
+      return at < 0 ? "" : email.slice(at + 1);
+    }
+    case "ENCODEURL": return encodeURIComponent(text(args[0]));
+    case "FIND": {
+      const position = text(args[1]).indexOf(text(args[0]));
+      return position < 0 ? 0 : position + 1;
+    }
+    case "INITIALS": return text(args[0]).trim().split(/\s+/).filter(Boolean).map((word) => Array.from(word)[0]).join("");
+    case "MID": {
+      const source = text(args[0]);
+      const start = Math.max(0, Math.trunc(numeric(args[1], "MID")) - 1);
+      const length = Math.max(0, Math.trunc(numeric(args[2], "MID")));
+      return Array.from(source).slice(start, start + length).join("");
+    }
+    case "SUBSTITUTE": {
+      const search = text(args[1]);
+      if (!search) throw new ExpressionError("SUBSTITUTE needs a non-empty search value.");
+      return text(args[0]).split(search).join(text(args[2]));
+    }
     case "TEXT": return text(args[0]);
     case "NUMBER":
     case "DECIMAL": return numeric(args[0], name);
@@ -581,6 +645,25 @@ function evaluateNode(node: Node, context: ExpressionContext, depth = 0): unknow
       const scale = 10 ** (args[1] === undefined ? 0 : Math.trunc(numeric(args[1], "ROUND")));
       return Math.round(numeric(args[0], "ROUND") * scale) / scale;
     }
+    case "AVERAGE": {
+      const values = list(args[0]);
+      if (!values.length) throw new ExpressionError("AVERAGE needs at least one number.");
+      return finiteResult(values.reduce<number>((sum, value) => sum + numeric(value, "AVERAGE"), 0) / values.length, "AVERAGE");
+    }
+    case "CEILING": return Math.ceil(numeric(args[0], "CEILING"));
+    case "FLOOR": return Math.floor(numeric(args[0], "FLOOR"));
+    case "LN": return finiteResult(Math.log(numeric(args[0], "LN")), "LN");
+    case "LOG":
+      return finiteResult(Math.log(numeric(args[0], "LOG")) / Math.log(args[1] === undefined ? 10 : numeric(args[1], "LOG")), "LOG");
+    case "LOG2": return finiteResult(Math.log2(numeric(args[0], "LOG2")), "LOG2");
+    case "LOG10": return finiteResult(Math.log10(numeric(args[0], "LOG10")), "LOG10");
+    case "MOD": {
+      const dividend = numeric(args[0], "MOD");
+      const divisor = numeric(args[1], "MOD");
+      return divisor === 0 ? 0 : dividend % divisor;
+    }
+    case "POWER": return finiteResult(numeric(args[0], "POWER") ** numeric(args[1], "POWER"), "POWER");
+    case "SQRT": return finiteResult(Math.sqrt(numeric(args[0], "SQRT")), "SQRT");
     case "ABS": return Math.abs(numeric(args[0], "ABS"));
     case "SUM": return list(args[0]).reduce<number>((sum, value) => sum + numeric(value, "SUM"), 0);
     case "MIN": return Math.min(...list(args[0]).map((value) => numeric(value, "MIN")));

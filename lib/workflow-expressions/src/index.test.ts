@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   computeFormExpressions,
   evaluateExpression,
+  expressionFunctions,
   getExpressionReferences,
   getExpressionDereferences,
   validateExpression,
@@ -100,6 +101,54 @@ test("supports AppSheet-style branching and current-value validation", () => {
     ...context,
     values: { ...context.values, _THIS: "Finance" },
   }), true);
+});
+
+test("evaluates AppSheet list helpers and validates their catalog examples", () => {
+  assert.deepEqual(evaluateExpression('INTERSECT([Tags], LIST("Travel", "People"))', context), ["Travel"]);
+  assert.deepEqual(evaluateExpression("SORT(LIST(3, 1, 2))", context), [1, 2, 3]);
+  assert.deepEqual(evaluateExpression("SORT(LIST(3, 1, 2), TRUE)", context), [3, 2, 1]);
+  assert.deepEqual(evaluateExpression("TOP(SORT(LIST(3, 1, 2), TRUE), 2)", context), [3, 2]);
+  assert.deepEqual(evaluateExpression("TOP(LIST(1, 2), 0)", context), []);
+  for (const name of ["INTERSECT", "SORT", "TOP"]) {
+    const fn = expressionFunctions.find((item) => item.name === name)!;
+    assert.equal(validateExpression(fn.example).valid, true, `${name} builder example`);
+  }
+});
+
+test("evaluates AppSheet math helpers and rejects invalid domains", () => {
+  assert.equal(evaluateExpression("AVERAGE(LIST(2, 4, 6))", context), 4);
+  assert.equal(evaluateExpression("CEILING(2.1)", context), 3);
+  assert.equal(evaluateExpression("FLOOR(-2.1)", context), -3);
+  assert.equal(evaluateExpression("LN(1)", context), 0);
+  assert.equal(evaluateExpression("LOG(100)", context), 2);
+  assert.equal(evaluateExpression("LOG(8, 2)", context), 3);
+  assert.equal(evaluateExpression("LOG2(8)", context), 3);
+  assert.equal(evaluateExpression("LOG10(1000)", context), 3);
+  assert.equal(evaluateExpression("MOD(-9, 7)", context), -2);
+  assert.equal(evaluateExpression("MOD(9, 0)", context), 0);
+  assert.equal(evaluateExpression("POWER(3, 2)", context), 9);
+  assert.equal(evaluateExpression("SQRT(81)", context), 9);
+  assert.throws(() => evaluateExpression("LN(0)", context), /numeric range/);
+  assert.throws(() => evaluateExpression("SQRT(-1)", context), /numeric range/);
+  for (const name of ["AVERAGE", "CEILING", "FLOOR", "LN", "LOG", "LOG2", "LOG10", "MOD", "POWER", "SQRT"]) {
+    const fn = expressionFunctions.find((item) => item.name === name)!;
+    assert.equal(validateExpression(fn.example).valid, true, `${name} builder example`);
+  }
+});
+
+test("evaluates AppSheet text and URL helpers with documented indexing rules", () => {
+  assert.equal(evaluateExpression('DOMAINOF("asha@example.com")', context), "example.com");
+  assert.equal(evaluateExpression('ENCODEURL("tea & cake")', context), "tea%20%26%20cake");
+  assert.equal(evaluateExpression('FIND("@", "asha@example.com")', context), 5);
+  assert.equal(evaluateExpression('FIND("A", "asha@example.com")', context), 0);
+  assert.equal(evaluateExpression('INITIALS("Asha Perera")', context), "AP");
+  assert.equal(evaluateExpression('MID("123 Maple Dr", 5, 5)', context), "Maple");
+  assert.equal(evaluateExpression('MID("abc", 2, 0)', context), "");
+  assert.equal(evaluateExpression('SUBSTITUTE("555-0100", "-", "")', context), "5550100");
+  for (const name of ["DOMAINOF", "ENCODEURL", "FIND", "INITIALS", "MID", "SUBSTITUTE"]) {
+    const fn = expressionFunctions.find((item) => item.name === name)!;
+    assert.equal(validateExpression(fn.example).valid, true, `${name} builder example`);
+  }
 });
 
 test("computes dependent fields in order and rejects formula cycles", () => {
