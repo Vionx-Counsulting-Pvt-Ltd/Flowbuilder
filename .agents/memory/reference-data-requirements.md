@@ -11,7 +11,13 @@ Staff onboarding must automatically fill the Region input from the selected Bran
 
 **Why:** The product owner explicitly requested Branch-to-Region automation, rather than requiring users to enter the region separately.
 
-**How to apply:** Use an explicit column-to-field mapping from the chosen branch record. Changing or clearing the branch must update or clear its derived region; do not infer it from the branch's displayed name.
+**How to apply:** The owner specifically requested AppSheet expressions for this connection, rather than a mapping-only setup. Use a table-linked Branch and a Region app formula such as `[Branch].[Region]`. Changing or clearing Branch must update or clear Region; do not infer it from the displayed branch name.
+
+For expression-based table references, give requesters only the columns explicitly referenced by the form, not the complete underlying table. Recalculate derived values on the server and preserve only the selected record's referenced values in historical snapshots.
+
+**Why:** A maintained table can contain unrelated private columns. Client-side formulas need scoped data, while submitted computed values and client-supplied lookup data cannot be trusted. Historical requests must not change when reference rows are edited.
+
+**How to apply:** Keep future relationship expressions within the published form's tenant-scoped sources and referenced columns. Broader table-query functions must preserve this boundary rather than exposing raw table management data.
 
 **Why:** Shared choice data needs to be maintained centrally rather than entered repeatedly in individual form definitions.
 

@@ -85,6 +85,8 @@ export type WorkflowField = {
   sourceTableId?: string | null;
   sourceLabelColumn?: string | null;
   optionLabels?: Record<string, string>;
+  referenceColumns?: { key: string; label: string }[];
+  referenceData?: Record<string, Record<string, string | number | boolean | null>>;
 };
 
 export type WorkflowStage = {

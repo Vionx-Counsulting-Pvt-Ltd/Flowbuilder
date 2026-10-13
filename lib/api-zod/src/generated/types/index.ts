@@ -55,6 +55,8 @@ export * from './volumeItem';
 export * from './workflow';
 export * from './workflowField';
 export * from './workflowFieldOptionLabels';
+export * from './workflowFieldReferenceColumnsItem';
+export * from './workflowFieldReferenceData';
 export * from './workflowFieldType';
 export * from './workflowInput';
 export * from './workflowStage';

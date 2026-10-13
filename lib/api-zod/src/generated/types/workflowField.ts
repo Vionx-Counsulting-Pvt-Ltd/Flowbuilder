@@ -7,6 +7,8 @@
  */
 import type { FieldCondition } from './fieldCondition';
 import type { WorkflowFieldOptionLabels } from './workflowFieldOptionLabels';
+import type { WorkflowFieldReferenceColumnsItem } from './workflowFieldReferenceColumnsItem';
+import type { WorkflowFieldReferenceData } from './workflowFieldReferenceData';
 import type { WorkflowFieldType } from './workflowFieldType';
 
 export interface WorkflowField {
@@ -21,6 +23,8 @@ export interface WorkflowField {
   sourceTableId?: string | null;
   /** @nullable */
   sourceLabelColumn?: string | null;
+  referenceColumns?: WorkflowFieldReferenceColumnsItem[];
+  referenceData?: WorkflowFieldReferenceData;
   optionLabels?: WorkflowFieldOptionLabels;
   /** @nullable */
   key?: string | null;

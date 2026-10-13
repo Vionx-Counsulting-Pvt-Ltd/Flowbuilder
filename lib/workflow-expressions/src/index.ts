@@ -2,6 +2,10 @@ export type ExpressionField = {
   id: string;
   key?: string | null;
   label?: string | null;
+  type?: string;
+  sourceTableId?: string | null;
+  referenceColumns?: { key: string; label: string }[];
+  referenceData?: Record<string, Record<string, string | number | boolean | null>>;
 };
 
 export type ExpressionUser = {
@@ -20,6 +24,9 @@ export type ExpressionContext = {
 export type ExpressionFieldDefinition = ExpressionField & {
   initialValueExpression?: string | null;
   appFormula?: string | null;
+  showIf?: string | null;
+  requiredIf?: string | null;
+  validIf?: string | null;
 };
 
 export type ExpressionFunction = {
@@ -84,6 +91,7 @@ type Token = { kind: TokenKind; value: string; offset: number };
 type Node =
   | { kind: "literal"; value: unknown }
   | { kind: "reference"; name: string }
+  | { kind: "dereference"; name: string; column: string }
   | { kind: "array"; values: Node[] }
   | { kind: "unary"; operator: string; value: Node }
   | { kind: "binary"; operator: string; left: Node; right: Node }
@@ -182,7 +190,7 @@ function tokenize(source: string): Token[] {
       index += 1;
       continue;
     }
-    if ("(),{}".includes(char)) {
+    if ("(),{}.".includes(char)) {
       add("punctuation", char, start);
       index += 1;
       continue;
@@ -291,7 +299,14 @@ class Parser {
     if (depth > MAX_NESTING) throw new ExpressionError("This expression is nested too deeply.", this.current().offset);
     if (this.is("number")) return { kind: "literal", value: Number(this.take().value) };
     if (this.is("string")) return { kind: "literal", value: this.take().value };
-    if (this.is("reference")) return { kind: "reference", name: this.take().value };
+    if (this.is("reference")) {
+      const name = this.take().value;
+      if (this.match("punctuation", ".")) {
+        if (!this.is("reference")) throw new ExpressionError("Use a table column in brackets after the dot, like [Branch].[Region].", this.current().offset);
+        return { kind: "dereference", name, column: this.take().value };
+      }
+      return { kind: "reference", name };
+    }
     if (this.match("punctuation", "(")) {
       const value = this.parseOr(depth + 1);
       this.expect("punctuation", ")");
@@ -364,7 +379,8 @@ function parseAndValidate(source: string, fields?: ExpressionField[]): { ast: No
   const ast = new Parser(tokenize(source)).parse();
   const references: string[] = [];
   walk(ast, (node) => {
-    if (node.kind === "reference") references.push(node.name);
+    if (node.kind === "reference" || node.kind === "dereference") references.push(node.name);
+    if (node.kind === "dereference" && fields) resolveDereferenceColumn(node.name, node.column, fields);
     if (node.kind === "call") {
       if (!supportedFunctions.has(node.name)) throw new ExpressionError(`The function ${node.name} is not supported.`);
       const error = arityError(node.name, node.args.length);
@@ -390,6 +406,30 @@ export function validateExpression(source: string, fields?: ExpressionField[]): 
 
 export function getExpressionReferences(source: string): string[] {
   return parseAndValidate(source).references;
+}
+
+export function getExpressionDereferences(source: string): { field: string; column: string }[] {
+  const { ast } = parseAndValidate(source);
+  const result: { field: string; column: string }[] = [];
+  walk(ast, node => { if (node.kind === "dereference") result.push({ field: node.name, column: node.column }); });
+  return result;
+}
+
+/** Drafts may contain unfinished formulas; validation reports these separately. */
+export function getFormDereferences(fields: ExpressionFieldDefinition[]): { field: string; column: string }[] {
+  return fields.flatMap(field => [field.appFormula, field.initialValueExpression, field.showIf, field.requiredIf, field.validIf].flatMap(source => {
+    if (!source?.trim()) return [];
+    try { return getExpressionDereferences(source); } catch { return []; }
+  }));
+}
+
+function resolveDereferenceColumn(name: string, columnName: string, fields: ExpressionField[]) {
+  const field = fields.find(candidate => [candidate.id, candidate.key, candidate.label].some(value => value?.trim().toLocaleLowerCase() === name.toLocaleLowerCase()));
+  if (!field) throw new ExpressionError(`No field matches [${name}].`);
+  if (!field.sourceTableId || !["select", "enum", "ref", "lookup", "radio"].includes(field.type || "")) throw new ExpressionError(`[${name}] must be a single-selection field linked to a table.`);
+  const column = field.referenceColumns?.find(candidate => [candidate.key, candidate.label].some(value => value.trim().toLocaleLowerCase() === columnName.toLocaleLowerCase()));
+  if (!column) throw new ExpressionError(`No linked table column matches [${name}].[${columnName}].`);
+  return { field, column };
 }
 
 function isBlank(value: unknown): boolean {
@@ -445,6 +485,15 @@ function evaluateNode(node: Node, context: ExpressionContext, depth = 0): unknow
   if (depth > MAX_NESTING) throw new ExpressionError("This expression is nested too deeply.");
   if (node.kind === "literal") return node.value;
   if (node.kind === "reference") return resolveReference(node.name, context);
+  if (node.kind === "dereference") {
+    const { field, column } = resolveDereferenceColumn(node.name, node.column, context.fields);
+    const selected = context.values[field.id];
+    if (isBlank(selected)) return null;
+    if (typeof selected !== "string" || !field.referenceData || !Object.prototype.hasOwnProperty.call(field.referenceData, selected)) throw new ExpressionError(`Choose an available table row for [${node.name}].`);
+    const row = field.referenceData[selected];
+    if (!Object.prototype.hasOwnProperty.call(row, column.key)) throw new ExpressionError(`The column [${node.column}] is not available to this form.`);
+    return row[column.key];
+  }
   if (node.kind === "array") return node.values.map((value) => evaluateNode(value, context, depth + 1));
   if (node.kind === "unary") {
     const value = evaluateNode(node.value, context, depth + 1);

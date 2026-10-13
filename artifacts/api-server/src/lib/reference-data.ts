@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, referenceRowsTable, referenceTablesTable, type ReferenceColumn, type ReferenceValues, type WorkflowField } from "@workspace/db";
+import { getFormDereferences } from "@workspace/workflow-expressions";
 
 export class ReferenceDataError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -54,11 +55,10 @@ export function normalizeReferenceValues(values: ReferenceValues, columns: Refer
 
 /** IDs are the submitted values; labels are refreshed for new forms and snapshotted for requests. */
 export async function hydrateReferenceFields(tenantId: string, fields: WorkflowField[], strict = false): Promise<WorkflowField[]> {
+  fields = storedReferenceFields(fields);
+  const dereferences = getFormDereferences(fields);
   const ids = [...new Set(fields.map(field => field.sourceTableId).filter((id): id is string => Boolean(id)))];
-  if (!ids.length) return fields.map(field => {
-    const { optionLabels: _labels, ...manual } = field;
-    return manual;
-  });
+  if (!ids.length) return fields;
   const tables = await db.select().from(referenceTablesTable).where(and(eq(referenceTablesTable.tenantId, tenantId), inArray(referenceTablesTable.id, ids)));
   const rows = tables.length ? await db.select().from(referenceRowsTable).where(and(inArray(referenceRowsTable.tableId, tables.map(table => table.id)), eq(referenceRowsTable.active, true))).orderBy(asc(referenceRowsTable.createdAt), asc(referenceRowsTable.id)) : [];
   return fields.map(field => {
@@ -73,12 +73,38 @@ export async function hydrateReferenceFields(tenantId: string, fields: WorkflowF
       return { ...field, options: [], optionLabels: {} };
     }
     const choices = rows.filter(row => row.tableId === table.id && row.values[column.key] != null && String(row.values[column.key]).trim() !== "");
-    return { ...field, options: choices.map(row => row.id), optionLabels: Object.fromEntries(choices.map(row => [row.id, String(row.values[column.key])])) };
+    const requested = table.columns.filter(column => dereferences.some(ref =>
+      [field.id, field.key, field.label].some(name => name?.trim().toLocaleLowerCase() === ref.field.toLocaleLowerCase()) &&
+      [column.key, column.label].some(name => name.trim().toLocaleLowerCase() === ref.column.toLocaleLowerCase())));
+    return {
+      ...field,
+      options: choices.map(row => row.id),
+      optionLabels: Object.fromEntries(choices.map(row => [row.id, String(row.values[column.key])])),
+      referenceColumns: (strict ? table.columns : requested).map(({ key, label }) => ({ key, label })),
+      referenceData: requested.length ? Object.fromEntries(choices.map(row => [row.id, Object.fromEntries(requested.map(column => [column.key, row.values[column.key] ?? null]))])) : {},
+    };
   });
 }
 export function storedReferenceFields(fields: WorkflowField[]): WorkflowField[] {
   return fields.map(field => {
-    const { optionLabels: _labels, ...definition } = field;
+    const { optionLabels: _labels, referenceData: _data, referenceColumns: _columns, ...definition } = field;
     return field.sourceTableId ? { ...definition, options: [] } : definition;
+  });
+}
+
+/** Keep only the selected row's approved column values for historical rules. */
+export function snapshotReferenceFields(fields: WorkflowField[], values: Record<string, unknown>): WorkflowField[] {
+  const refs = getFormDereferences(fields);
+  return fields.map(field => {
+    if (!field.sourceTableId) return field;
+    const selected = values[field.id];
+    const row = typeof selected === "string" && field.referenceData && Object.prototype.hasOwnProperty.call(field.referenceData, selected) ? field.referenceData[selected] : undefined;
+    return {
+      ...field,
+      referenceColumns: field.referenceColumns?.filter(column => refs.some(ref =>
+        [field.id, field.key, field.label].some(name => name?.trim().toLocaleLowerCase() === ref.field.toLocaleLowerCase()) &&
+        [column.key, column.label].some(name => name.toLocaleLowerCase() === ref.column.toLocaleLowerCase()))),
+      referenceData: row ? { [selected as string]: row } : {},
+    };
   });
 }

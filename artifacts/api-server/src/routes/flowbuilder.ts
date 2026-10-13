@@ -78,7 +78,7 @@ import {
   type MemberContext,
 } from "../lib/flowbuilder-auth";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { hydrateReferenceFields, ReferenceDataError, storedReferenceFields } from "../lib/reference-data";
+import { hydrateReferenceFields, ReferenceDataError, snapshotReferenceFields, storedReferenceFields } from "../lib/reference-data";
 import type {
   WorkflowField,
   WorkflowStage,
@@ -1487,7 +1487,7 @@ router.post("/requests", async (req, res): Promise<void> => {
       assignedRoleId: target.assignedRoleId,
       dueAt: new Date(createdAt.getTime() + dueHours * 60 * 60 * 1000),
       formData: submissionData,
-      fieldsSnapshot: workflow.fields,
+      fieldsSnapshot: snapshotReferenceFields(workflow.fields, submissionData),
       stagesSnapshot: eligibleStages,
       approvedStageIds: [],
     })

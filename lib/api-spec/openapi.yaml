@@ -692,6 +692,18 @@ components:
           items: { type: string }
         sourceTableId: { type: ["string", "null"] }
         sourceLabelColumn: { type: ["string", "null"] }
+        referenceColumns:
+          type: array
+          items:
+            type: object
+            required: [key, label]
+            properties:
+              key: { type: string }
+              label: { type: string }
+        referenceData:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ReferenceValues"
         optionLabels:
           type: object
           additionalProperties: { type: string }

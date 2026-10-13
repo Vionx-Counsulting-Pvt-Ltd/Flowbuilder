@@ -455,6 +455,11 @@ export const ListWorkflowsResponseItem = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -537,6 +542,11 @@ export const CreateWorkflowBody = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -609,6 +619,11 @@ export const CreateWorkflowResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -694,6 +709,11 @@ export const GetWorkflowResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -780,6 +800,11 @@ export const UpdateWorkflowBody = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -852,6 +877,11 @@ export const UpdateWorkflowResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -972,6 +1002,11 @@ export const CreateRequestResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -1067,6 +1102,11 @@ export const GetRequestResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
@@ -1167,6 +1207,11 @@ export const ActOnRequestResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
   "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),

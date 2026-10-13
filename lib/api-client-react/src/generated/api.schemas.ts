@@ -164,6 +164,13 @@ export const WorkflowFieldType = {
   show: 'show',
 } as const;
 
+export type WorkflowFieldReferenceColumnsItem = {
+  key: string;
+  label: string;
+};
+
+export type WorkflowFieldReferenceData = {[key: string]: ReferenceValues};
+
 export type WorkflowFieldOptionLabels = {[key: string]: string};
 
 export type FieldConditionOperator = typeof FieldConditionOperator[keyof typeof FieldConditionOperator];
@@ -193,6 +200,8 @@ export interface WorkflowField {
   sourceTableId?: string | null;
   /** @nullable */
   sourceLabelColumn?: string | null;
+  referenceColumns?: WorkflowFieldReferenceColumnsItem[];
+  referenceData?: WorkflowFieldReferenceData;
   optionLabels?: WorkflowFieldOptionLabels;
   /** @nullable */
   key?: string | null;

@@ -3,9 +3,57 @@ import test from "node:test";
 import {
   computeFormExpressions,
   evaluateExpression,
+  getExpressionReferences,
+  getExpressionDereferences,
   validateExpression,
   type ExpressionContext,
 } from "./index";
+
+const branchReference: ExpressionContext["fields"][number] = {
+  id: "branch", key: "branch_key", label: "Branch", type: "select", sourceTableId: "branches",
+  referenceColumns: [{ key: "region", label: "Region" }, { key: "code", label: "Branch Code" }, { key: "capacity", label: "Capacity" }, { key: "enabled", label: "Enabled" }],
+  referenceData: {
+    west: { region: "Western", code: "001", capacity: 12, enabled: false },
+    east: { region: "Eastern", code: "002", capacity: 5, enabled: true },
+    empty: { region: null },
+  },
+};
+
+test("AppSheet dereferences use the selected row and match field/column labels or keys", () => {
+  const ctx = { fields: [branchReference], values: { branch: "west" } };
+  assert.equal(evaluateExpression("[Branch].[Region]", ctx), "Western");
+  assert.equal(evaluateExpression("[branch_key].[REGION]", ctx), "Western");
+  assert.equal(evaluateExpression("[Branch].[Branch Code]", ctx), "001");
+  assert.equal(evaluateExpression("[Branch].[Capacity] + .5", ctx), 12.5);
+  assert.equal(evaluateExpression("[Branch].[Enabled]", ctx), false);
+  assert.deepEqual(getExpressionReferences('[Branch].[Region] & [Branch].[Branch Code]'), ["Branch"]);
+  assert.deepEqual(getExpressionDereferences("[Branch].[Region]"), [{ field: "Branch", column: "Region" }]);
+});
+
+test("computed Region updates, clears, and cannot be overridden by submitted values", () => {
+  const fields = [{ id: "region", label: "Region", appFormula: "[Branch].[Region]" }, branchReference];
+  assert.equal(computeFormExpressions(fields, { branch: "west", region: "Forged" }).region, "Western");
+  assert.equal(computeFormExpressions(fields, { branch: "east", region: "Old" }).region, "Eastern");
+  assert.equal(computeFormExpressions(fields, { branch: "", region: "Old" }).region, null);
+  assert.equal(computeFormExpressions(fields, { branch: "empty" }).region, null);
+  assert.equal(evaluateExpression('IF(ISBLANK([Branch]), "", [Branch].[Region])', { fields, values: { branch: "" } }), "");
+});
+
+test("dereferences reject unsupported sources, columns, row IDs, property access and multiple hops", () => {
+  const ctx = { fields: [branchReference], values: { branch: "foreign" } };
+  assert.throws(() => evaluateExpression("[Branch].[Region]", ctx), /available table row/);
+  assert.throws(() => evaluateExpression("[Branch].[Enabled]", { ...ctx, values: { branch: "empty" } }), /not available to this form/);
+  assert.equal(validateExpression("[Branch].[Missing]", ctx.fields).valid, false);
+  assert.equal(validateExpression("[Branch].[constructor]", ctx.fields).valid, false);
+  assert.equal(validateExpression("[Branch].Region", ctx.fields).valid, false);
+  assert.equal(validateExpression("[Branch].[Region].[Name]", ctx.fields).valid, false);
+  assert.equal(validateExpression("[Branch].[Region]", [{ ...branchReference, type: "enumlist" }]).valid, false);
+  assert.equal(validateExpression("[Branch].[Region]", [{ ...branchReference, sourceTableId: null }]).valid, false);
+  assert.throws(() => computeFormExpressions([
+    { ...branchReference, appFormula: "[Region]" },
+    { id: "region", label: "Region", appFormula: "[Branch].[Region]" },
+  ], {}), /loop/);
+});
 
 const context: ExpressionContext = {
   fields: [
