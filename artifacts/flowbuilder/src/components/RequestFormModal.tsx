@@ -294,7 +294,12 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
         <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm">
           {uploadingField === field.id ? <LoaderCircle className="animate-spin" size={16} /> : <Paperclip size={16} />}
           {uploadingField === field.id ? "Uploading…" : ["signature", "drawing"].includes(field.type) ? "Or upload an image" : "Choose file"}
-          <input className="sr-only" data-testid={dataTestId} type="file" disabled={disabled || uploadingField === field.id} multiple={Boolean(field.multiple)} accept={accept} onChange={event => { const selectedFiles = event.currentTarget.files; event.currentTarget.value = ""; void uploadFiles(field, selectedFiles); }} />
+          <input className="sr-only" data-testid={dataTestId} type="file" disabled={disabled || uploadingField === field.id} multiple={Boolean(field.multiple)} accept={accept} onChange={event => {
+            // FileList is live: resetting the picker empties it, so retain the File objects first.
+            const selectedFiles = Array.from(event.currentTarget.files ?? []);
+            event.currentTarget.value = "";
+            void uploadFiles(field, selectedFiles);
+          }} />
         </label>
         <p className="text-xs text-muted-foreground">{["drawing", "signature"].includes(field.type) ? "Captured or uploaded image is stored privately in this workspace." : "Private workspace upload."} · up to {field.multiple ? field.maxFiles ?? 10 : 1} file{field.multiple ? "s" : ""} · {field.maxFileSizeMB ?? 20} MB each.</p>
         {files.map(file => <div key={file.fileId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"><span className="truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="text-destructive" data-testid={`remove-upload-${field.id}-${file.fileId}`} onClick={() => onChange(files.filter(item => item.fileId !== file.fileId))}>Remove</button></div>)}
