@@ -72,7 +72,7 @@ import {
   getExpressionReferences,
   validateExpression,
 } from "@workspace/workflow-expressions";
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter, type RequestHandler, type Response } from "express";
 import {
   currentMember,
   hasPermission,
@@ -87,9 +87,7 @@ import type {
   WorkflowStage,
 } from "@workspace/db";
 
-const router: IRouter = Router();
 const objectStorage = new ObjectStorageService();
-router.use(requireMember);
 
 type RequestRow = {
   request: typeof requestsTable.$inferSelect;
@@ -999,6 +997,13 @@ async function notifyCurrentStages(
   });
 }
 
+export function createFlowbuilderRouter(
+  authenticate: RequestHandler = requireMember,
+  storage: Pick<ObjectStorageService, "getTenantFile"> = objectStorage,
+): IRouter {
+const router: IRouter = Router();
+router.use(authenticate);
+
 router.get("/me", async (_req, res): Promise<void> => {
   const member = currentMember(res);
   const [tenant] = await db
@@ -1446,7 +1451,7 @@ router.post("/requests", async (req, res): Promise<void> => {
       size: number;
     }> | undefined;
     for (const uploaded of files ?? []) {
-      const storedFile = await objectStorage.getTenantFile(member.tenantId, uploaded.fileId);
+      const storedFile = await storage.getTenantFile(member.tenantId, uploaded.fileId);
       if (!storedFile) {
         res.status(400).json({ error: `A file for ${field.label} could not be found.` });
         return;
@@ -2525,4 +2530,9 @@ router.use((error: unknown, _req: import("express").Request, res: Response, next
   if (error instanceof ReferenceDataError) { res.status(error.status).json({ error: error.message }); return; }
   next(error);
 });
+return router;
+}
+
+const router = createFlowbuilderRouter();
+
 export default router;
