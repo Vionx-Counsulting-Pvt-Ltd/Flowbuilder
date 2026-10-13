@@ -27,6 +27,8 @@ export type MemberContext = {
   managerId: string | null;
 };
 
+const memberResolutions = new Map<string, Promise<MemberContext | null>>();
+
 const defaultRoleDefinitions = [
   {
     name: "Company Admin",
@@ -344,6 +346,23 @@ async function inviteExistingMember(input: {
 }
 
 export async function resolveMember(
+  clerkUserId: string,
+): Promise<MemberContext | null> {
+  const pending = memberResolutions.get(clerkUserId);
+  if (pending) return pending;
+
+  const resolution = resolveMemberOnce(clerkUserId);
+  memberResolutions.set(clerkUserId, resolution);
+  try {
+    return await resolution;
+  } finally {
+    if (memberResolutions.get(clerkUserId) === resolution) {
+      memberResolutions.delete(clerkUserId);
+    }
+  }
+}
+
+async function resolveMemberOnce(
   clerkUserId: string,
 ): Promise<MemberContext | null> {
   const existing = await loadMember(clerkUserId);
