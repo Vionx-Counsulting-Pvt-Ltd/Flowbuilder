@@ -11,34 +11,61 @@ import {
   useListRoles, useListUsers, useUpdateWorkflow,
 } from '@workspace/api-client-react';
 import type { WorkflowField, WorkflowInput, WorkflowStage } from '@workspace/api-client-react';
+import { computeFormExpressions, evaluateExpression, expressionFunctions, validateExpression, type ExpressionContext, type ExpressionUser } from '@workspace/workflow-expressions';
 
 type FieldType = WorkflowField['type'];
 const fieldTypes: { type: FieldType; label: string; icon: typeof Hash }[] = [
-  { type: 'text', label: 'Text', icon: Hash }, { type: 'textarea', label: 'Long Text', icon: ListChecks },
-  { type: 'number', label: 'Number', icon: Hash }, { type: 'date', label: 'Date', icon: CalendarDays },
-  { type: 'time', label: 'Time', icon: Clock3 }, { type: 'datetime', label: 'Date & Time', icon: CalendarDays },
-  { type: 'select', label: 'Dropdown', icon: ChevronDown }, { type: 'multiselect', label: 'Multi-Select', icon: ListChecks },
-  { type: 'checkbox', label: 'Checkbox', icon: Check }, { type: 'radio', label: 'Radio Group', icon: ListChecks },
-  { type: 'file', label: 'File Upload', icon: FileUp }, { type: 'people', label: 'People Picker', icon: UserRound },
-  { type: 'lookup', label: 'Lookup', icon: Search },
+  { type: 'text', label: 'Text', icon: Hash }, { type: 'textarea', label: 'Textarea', icon: ListChecks },
+  { type: 'longtext', label: 'Long text', icon: ListChecks }, { type: 'name', label: 'Name', icon: UserRound },
+  { type: 'email', label: 'Email', icon: Hash }, { type: 'phone', label: 'Phone', icon: Hash },
+  { type: 'url', label: 'URL', icon: Hash }, { type: 'address', label: 'Address', icon: ListChecks },
+  { type: 'number', label: 'Number', icon: Hash }, { type: 'decimal', label: 'Decimal', icon: Hash },
+  { type: 'percent', label: 'Percent', icon: Hash }, { type: 'price', label: 'Price', icon: Hash },
+  { type: 'date', label: 'Date', icon: CalendarDays }, { type: 'time', label: 'Time', icon: Clock3 },
+  { type: 'datetime', label: 'Date & time', icon: CalendarDays }, { type: 'duration', label: 'Duration', icon: Clock3 },
+  { type: 'select', label: 'Dropdown', icon: ChevronDown }, { type: 'enum', label: 'Enum', icon: ChevronDown },
+  { type: 'multiselect', label: 'Multi-select', icon: ListChecks }, { type: 'enumlist', label: 'Enum list', icon: ListChecks },
+  { type: 'checkbox', label: 'Checkbox', icon: Check }, { type: 'yesno', label: 'Yes / no', icon: Check },
+  { type: 'radio', label: 'Radio group', icon: ListChecks }, { type: 'progress', label: 'Progress', icon: Hash },
+  { type: 'ref', label: 'Reference', icon: Search }, { type: 'file', label: 'File', icon: FileUp },
+  { type: 'image', label: 'Image', icon: FileUp }, { type: 'thumbnail', label: 'Thumbnail', icon: FileUp },
+  { type: 'drawing', label: 'Drawing', icon: FileUp }, { type: 'signature', label: 'Signature', icon: FileUp },
+  { type: 'video', label: 'Video', icon: FileUp }, { type: 'people', label: 'People', icon: UserRound },
+  { type: 'lookup', label: 'Lookup', icon: Search }, { type: 'color', label: 'Color', icon: Hash },
+  { type: 'latlong', label: 'Latitude / longitude', icon: Search }, { type: 'location', label: 'Location', icon: Search },
+  { type: 'xy', label: 'X / Y coordinates', icon: Search }, { type: 'show', label: 'Display text', icon: ListChecks },
 ];
 const newId = () => crypto.randomUUID();
+const progressOptions = ['Empty', 'Quarter', 'Half', 'Three Quarter', 'Full'];
+const colorOptions = ['Black', 'Blue', 'Green', 'Orange', 'Purple', 'Red', 'Yellow', 'White'];
 const blankField = (type: FieldType = 'text'): WorkflowField => ({
   id: newId(), label: fieldTypes.find(item => item.type === type)?.label || 'New field', type, required: false,
-  width: 6, placeholder: '', ...(type === 'select' || type === 'multiselect' || type === 'radio' ? { options: ['Option 1', 'Option 2'] } : {}),
-  ...(type === 'file' ? { multiple: false, maxFiles: 1, maxFileSizeMB: 10 } : {}),
+  width: 6, placeholder: '', ...(type === 'progress' ? { options: progressOptions } : choiceTypes.has(type) ? { options: ['Option 1', 'Option 2'] } : {}),
+  ...(uploadTypes.has(type) ? { multiple: false, maxFiles: 1, maxFileSizeMB: 10, accept: uploadAccept[type] } : {}),
 });
+const choiceTypes = new Set<FieldType>(['select', 'enum', 'multiselect', 'enumlist', 'radio', 'ref', 'lookup', 'progress']);
+const uploadAccept: Partial<Record<FieldType, string>> = { image: 'image/*', thumbnail: 'image/*', drawing: 'image/*', signature: 'image/*' };
+const uploadTypes = new Set<FieldType>(['file', 'image', 'thumbnail', 'drawing', 'signature']);
+const exprContext = (fields: WorkflowField[], values: Record<string, unknown>, user?: ExpressionUser): ExpressionContext => ({ fields, values, user });
+function expressionResult(source: string | null | undefined, fields: WorkflowField[], values: Record<string, unknown>, fallback: unknown, user?: ExpressionUser): unknown {
+  if (!source?.trim()) return fallback;
+  try { return evaluateExpression(source, exprContext(fields, values, user)); } catch { return fallback; }
+}
 const blankStage = (order: number): WorkflowStage => ({ id: newId(), name: '', order, assigneeType: 'manager', assigneeLabel: 'Manager', slaHours: 24 });
 function previewDefault(field: WorkflowField): unknown {
   if (field.type === 'checkbox') return field.defaultValue === 'true';
-  if (field.type === 'multiselect' || (field.type === 'people' && field.multiple) || field.type === 'file') return [];
+  if (field.type === 'yesno') return field.defaultValue === 'true' ? true : field.defaultValue === 'false' ? false : '';
+  if (['multiselect', 'enumlist'].includes(field.type) || (field.type === 'people' && field.multiple) || uploadTypes.has(field.type)) return [];
   return field.defaultValue ?? '';
 }
-function previewValuesFor(fields: WorkflowField[], current: Record<string, unknown>) {
-  return Object.fromEntries(fields.map(field => [field.id, current[field.id] ?? previewDefault(field)]));
+function previewValuesFor(fields: WorkflowField[], current: Record<string, unknown>, user?: ExpressionUser) {
+  const values: Record<string, unknown> = Object.fromEntries(fields.map(field => [field.id, current[field.id] ?? previewDefault(field)]));
+  for (const field of fields) if (field.initialValueExpression && current[field.id] === undefined) delete values[field.id];
+  try { return computeFormExpressions(fields, values, user); } catch { return values; }
 }
-function isPreviewFieldVisible(field: WorkflowField, fields: WorkflowField[], values: Record<string, unknown>) {
+function isPreviewFieldVisible(field: WorkflowField, fields: WorkflowField[], values: Record<string, unknown>, user?: ExpressionUser) {
   if (field.hidden) return false;
+  if (field.showIf?.trim()) return Boolean(expressionResult(field.showIf, fields, { ...values, _THIS: values[field.id] }, false, user));
   const condition = field.displayCondition;
   if (!condition || !fields.some(item => item.id === condition.fieldId)) return true;
   const current = values[condition.fieldId];
@@ -67,6 +94,9 @@ export default function WorkflowEditor() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const current = useGetCurrentUser();
+  const previewUser = useMemo<ExpressionUser | undefined>(() => current.data
+    ? { email: current.data.email, name: current.data.name, role: current.data.roleName }
+    : undefined, [current.data?.email, current.data?.name, current.data?.roleName]);
   const canBuild = Boolean(current.data?.permissions.includes('admin') || current.data?.permissions.includes('build') || current.data?.roleName === 'Workflow Owner');
   const detail = useGetWorkflow(workflowId || '', { query: { enabled: Boolean(workflowId), queryKey: getGetWorkflowQueryKey(workflowId || '') } });
   const roles = useListRoles({ query: { enabled: canBuild, queryKey: getListRolesQueryKey() } });
@@ -107,8 +137,14 @@ export default function WorkflowEditor() {
     const labels = definition.fields.map(field => field.label.trim().toLowerCase()).filter(Boolean);
     if (new Set(labels).size !== labels.length) result.push('Field labels must be unique.');
     definition.fields.forEach((field, index) => {
-      if (['select', 'multiselect', 'radio'].includes(field.type) && !(field.options || []).some(option => option.trim())) result.push(`${field.label || `Field ${index + 1}`} needs at least one option.`);
+      if (choiceTypes.has(field.type) && field.type !== 'progress' && !(field.options || []).some(option => option.trim())) result.push(`${field.label || `Field ${index + 1}`} needs at least one option.`);
       if (field.displayCondition && !definition.fields.some(item => item.id === field.displayCondition?.fieldId)) result.push(`${field.label || `Field ${index + 1}`} has an invalid display condition.`);
+      for (const [name, expression] of [['initial value', field.initialValueExpression], ['app formula', field.appFormula], ['show condition', field.showIf], ['required condition', field.requiredIf], ['validity rule', field.validIf]] as const) {
+        if (expression?.trim()) {
+          const check = validateExpression(expression, definition.fields);
+          if (!check.valid) result.push(`${field.label || `Field ${index + 1}`} ${name}: ${check.error}`);
+        }
+      }
     });
     if (!definition.stages.length) result.push('Add at least one approval stage.');
     definition.stages.forEach((stage, index) => {
@@ -120,8 +156,8 @@ export default function WorkflowEditor() {
     return result;
   }, [definition]);
   const previewValues = useMemo(
-    () => previewValuesFor(definition.fields, testValues),
-    [definition.fields, testValues],
+    () => previewValuesFor(definition.fields, testValues, previewUser),
+    [definition.fields, testValues, previewUser],
   );
   function patchField(id: string, patch: Partial<WorkflowField>) {
     setDefinition(value => ({ ...value, fields: value.fields.map(field => field.id === id ? { ...field, ...patch } : field) }));
@@ -140,14 +176,24 @@ export default function WorkflowEditor() {
   function validatePreview() {
     const errors: Record<string, string> = {};
     definition.fields.forEach(field => {
-      if (!isPreviewFieldVisible(field, definition.fields, previewValues)) return;
+      if (!isPreviewFieldVisible(field, definition.fields, previewValues, previewUser)) return;
       const value = previewValues[field.id];
-      if (field.required && (field.type === 'checkbox' ? value !== true : Array.isArray(value) ? !value.length : String(value ?? '').trim() === '')) errors[field.id] = 'This field is required.';
-      else if (field.type === 'number' && String(value ?? '').trim() && !Number.isFinite(Number(value))) errors[field.id] = 'Enter a valid number.';
-      else if (field.type === 'number' && value !== undefined && field.min != null && Number(value) < field.min) errors[field.id] = `Enter a number of at least ${field.min}.`;
-      else if (field.type === 'number' && value !== undefined && field.max != null && Number(value) > field.max) errors[field.id] = `Enter a number no greater than ${field.max}.`;
+      const required = field.required || Boolean(expressionResult(field.requiredIf, definition.fields, { ...previewValues, _THIS: value }, false, previewUser));
+      if (required && (field.type === 'checkbox' ? value !== true : Array.isArray(value) ? !value.length : String(value ?? '').trim() === '')) errors[field.id] = 'This field is required.';
+      else if (['number', 'decimal', 'percent', 'price'].includes(field.type) && String(value ?? '').trim() && !Number.isFinite(Number(value))) errors[field.id] = 'Enter a valid number.';
+      else if (['number', 'decimal', 'percent', 'price'].includes(field.type) && value !== undefined && field.min != null && Number(value) < field.min) errors[field.id] = `Enter a number of at least ${field.min}.`;
+      else if (['number', 'decimal', 'percent', 'price'].includes(field.type) && value !== undefined && field.max != null && Number(value) > field.max) errors[field.id] = `Enter a number no greater than ${field.max}.`;
       else if (typeof value === 'string' && field.minLength != null && value.length < field.minLength) errors[field.id] = `Use at least ${field.minLength} characters.`;
       else if (typeof value === 'string' && field.maxLength != null && value.length > field.maxLength) errors[field.id] = `Use no more than ${field.maxLength} characters.`;
+      else if (field.validIf) {
+        const validation = expressionResult(field.validIf, definition.fields, { ...previewValues, _THIS: value }, false, previewUser);
+        const valid = typeof validation === 'boolean'
+          ? validation
+          : Array.isArray(validation)
+            ? (Array.isArray(value) ? value.every(item => validation.some(option => String(option) === String(item))) : validation.some(option => String(option) === String(value)))
+            : false;
+        if (!valid) errors[field.id] = field.invalidMessage || 'This answer is not valid.';
+      }
     });
     setPreviewErrors(errors);
   }
@@ -230,7 +276,7 @@ export default function WorkflowEditor() {
                 {definition.fields.map((field, index) => <button key={field.id} type="button" className={`fb-field-block ${selectedId === field.id ? 'is-selected' : ''} ${field.hidden ? 'is-hidden' : ''}`} style={{ gridColumn: `span ${Math.min(6, Math.max(1, field.width || 6))}` }} onClick={() => setSelectedId(field.id)} data-testid={`canvas-field-${field.id}`} aria-pressed={selectedId === field.id}>
                   <div className="fb-field-block-top"><span className="fb-type-badge">{fieldTypes.find(item => item.type === field.type)?.label || field.type}</span><span className="fb-field-index">FIELD {String(index + 1).padStart(2, '0')}</span>{field.required && <span className="fb-required-mark">Required</span>}</div>
                   <strong>{field.label || 'Untitled field'}</strong>
-                  <div className="fb-canvas-control">{field.type === 'textarea' ? 'Long answer' : ['select', 'multiselect', 'radio'].includes(field.type) ? (field.options?.[0] || 'Add an option') : field.type === 'checkbox' ? field.placeholder || 'Choose an option' : field.type === 'file' ? 'Drop files or browse' : field.placeholder || 'Your answer'}</div>
+                  <div className="fb-canvas-control">{field.type === 'show' ? (field.helpText || field.placeholder || 'Presentational content') : ['textarea', 'longtext', 'address'].includes(field.type) ? 'Long answer' : choiceTypes.has(field.type) ? (field.options?.[0] || 'Add an option') : field.type === 'checkbox' || field.type === 'yesno' ? field.placeholder || 'Choose an option' : uploadTypes.has(field.type) ? 'Private upload' : field.placeholder || 'Your answer'}</div>
                   {field.helpText && <small className="fb-block-help">{field.helpText}</small>}
                 </button>)}
                 {!definition.fields.length && <div className="fb-canvas-empty"><div className="fb-empty-icon"><Plus size={20} /></div><h3>Start with a question</h3><p>Choose a field type from the left to shape the request form.</p><button type="button" onClick={() => addField('text')} data-testid="button-empty-add-field">Add your first field <ArrowRight size={14} /></button></div>}
@@ -262,10 +308,19 @@ export default function WorkflowEditor() {
           {selected ? <div className="fb-property-content">
             <div className="fb-prop-group"><span className="fb-prop-label">IDENTITY</span><Label title="Field key" hint="Stable identifier used in submitted data."><input className={inputClass} value={selected.key || ''} placeholder={selected.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'field_key'} onChange={e => patchField(selected.id, { key: e.target.value || undefined })} data-testid={`input-field-key-${selected.id}`} /></Label><Label title="Label"><input className={inputClass} value={selected.label} onChange={e => patchField(selected.id, { label: e.target.value })} placeholder="Question label" data-testid={`input-field-label-${selected.id}`} /></Label><Label title="Placeholder"><input className={inputClass} value={selected.placeholder || ''} onChange={e => patchField(selected.id, { placeholder: e.target.value || undefined })} placeholder="Help the requester answer…" data-testid={`input-field-placeholder-${selected.id}`} /></Label><Label title="Help text"><input className={inputClass} value={selected.helpText || ''} onChange={e => patchField(selected.id, { helpText: e.target.value || undefined })} placeholder="Additional guidance" data-testid={`input-field-help-${selected.id}`} /></Label></div>
             <div className="fb-prop-group"><span className="fb-prop-label">STATE</span><label className="fb-switch-row"><span>Required</span><input type="checkbox" checked={selected.required} onChange={e => patchField(selected.id, { required: e.target.checked })} data-testid={`toggle-field-required-${selected.id}`} /></label><label className="fb-switch-row"><span>Read-only</span><input type="checkbox" checked={Boolean(selected.readOnly)} onChange={e => patchField(selected.id, { readOnly: e.target.checked })} data-testid={`toggle-field-readonly-${selected.id}`} /></label><label className="fb-switch-row"><span>Hidden</span><input type="checkbox" checked={Boolean(selected.hidden)} onChange={e => patchField(selected.id, { hidden: e.target.checked })} data-testid={`toggle-field-hidden-${selected.id}`} /></label><Label title="Initial value"><input className={inputClass} value={selected.defaultValue || ''} onChange={e => patchField(selected.id, { defaultValue: e.target.value || undefined })} placeholder="Optional default" data-testid={`input-field-default-${selected.id}`} /></Label></div>
-            {['select', 'multiselect', 'radio', 'lookup'].includes(selected.type) && <div className="fb-prop-group"><span className="fb-prop-label">OPTIONS</span><Label title={selected.type === 'lookup' ? 'Lookup source · one per line' : 'Choices · one per line'}><textarea className={`${inputClass} fb-options-input`} value={(selected.options || []).join('\n')} onChange={e => patchField(selected.id, { options: e.target.value.split('\n') })} placeholder={'New request\nChange request\nRenewal'} data-testid={`input-field-options-${selected.id}`} /></Label><span className="fb-prop-hint">Each line becomes one selectable option.</span>{selected.type === 'multiselect' && <label className="fb-switch-row"><span>Allow multiple selections</span><input type="checkbox" checked={selected.multiple !== false} onChange={e => patchField(selected.id, { multiple: e.target.checked })} data-testid={`toggle-field-multiple-${selected.id}`} /></label>}</div>}
-            {(selected.type === 'text' || selected.type === 'textarea') && <div className="fb-prop-group"><span className="fb-prop-label">VALIDATION</span><div className="fb-two-inputs"><Label title="Min length"><input className={inputClass} type="number" min="0" value={selected.minLength ?? ''} onChange={e => patchField(selected.id, { minLength: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-min-length-${selected.id}`} /></Label><Label title="Max length"><input className={inputClass} type="number" min="0" value={selected.maxLength ?? ''} onChange={e => patchField(selected.id, { maxLength: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-max-length-${selected.id}`} /></Label></div></div>}
-            {selected.type === 'number' && <div className="fb-prop-group"><span className="fb-prop-label">VALIDATION</span><div className="fb-two-inputs"><Label title="Minimum"><input className={inputClass} type="number" value={selected.min ?? ''} onChange={e => patchField(selected.id, { min: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-min-${selected.id}`} /></Label><Label title="Maximum"><input className={inputClass} type="number" value={selected.max ?? ''} onChange={e => patchField(selected.id, { max: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-max-${selected.id}`} /></Label></div></div>}
-            {selected.type === 'file' && <div className="fb-prop-group"><span className="fb-prop-label">UPLOAD RULES</span><label className="fb-switch-row"><span>Allow multiple files</span><input type="checkbox" checked={Boolean(selected.multiple)} onChange={e => patchField(selected.id, { multiple: e.target.checked, maxFiles: e.target.checked ? selected.maxFiles || 5 : 1 })} data-testid={`toggle-field-file-multiple-${selected.id}`} /></label><Label title="Accepted file types"><input className={inputClass} value={selected.accept || ''} onChange={e => patchField(selected.id, { accept: e.target.value || undefined })} placeholder=".pdf, .png, image/*" data-testid={`input-field-accept-${selected.id}`} /></Label><div className="fb-two-inputs"><Label title="Max files"><input className={inputClass} type="number" min="1" max="10" value={selected.maxFiles || 1} onChange={e => patchField(selected.id, { maxFiles: Number(e.target.value) })} data-testid={`input-field-max-files-${selected.id}`} /></Label><Label title="Size · MB"><input className={inputClass} type="number" min="1" max="25" value={selected.maxFileSizeMB || 10} onChange={e => patchField(selected.id, { maxFileSizeMB: Number(e.target.value) })} data-testid={`input-field-max-size-${selected.id}`} /></Label></div></div>}
+             {choiceTypes.has(selected.type) && selected.type !== 'progress' && <div className="fb-prop-group"><span className="fb-prop-label">OPTIONS</span><Label title={selected.type === 'lookup' || selected.type === 'ref' ? 'Configured values · one per line' : 'Choices · one per line'}><textarea className={`${inputClass} fb-options-input`} value={(selected.options || []).join('\n')} onChange={e => patchField(selected.id, { options: e.target.value.split('\n') })} placeholder={'New request\nChange request\nRenewal'} data-testid={`input-field-options-${selected.id}`} /></Label><span className="fb-prop-hint">Each line becomes one selectable option.</span>{['multiselect', 'enumlist'].includes(selected.type) && <label className="fb-switch-row"><span>Allow multiple selections</span><input type="checkbox" checked={selected.multiple !== false} onChange={e => patchField(selected.id, { multiple: e.target.checked })} data-testid={`toggle-field-multiple-${selected.id}`} /></label>}</div>}
+             {['text', 'textarea', 'longtext', 'name', 'email', 'phone', 'url', 'address'].includes(selected.type) && <div className="fb-prop-group"><span className="fb-prop-label">VALIDATION</span><div className="fb-two-inputs"><Label title="Min length"><input className={inputClass} type="number" min="0" value={selected.minLength ?? ''} onChange={e => patchField(selected.id, { minLength: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-min-length-${selected.id}`} /></Label><Label title="Max length"><input className={inputClass} type="number" min="0" value={selected.maxLength ?? ''} onChange={e => patchField(selected.id, { maxLength: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-max-length-${selected.id}`} /></Label></div></div>}
+             {['number', 'decimal', 'percent', 'price'].includes(selected.type) && <div className="fb-prop-group"><span className="fb-prop-label">RANGE</span><div className="fb-two-inputs"><Label title="Minimum"><input className={inputClass} type="number" step={selected.type === 'number' ? 1 : 'any'} value={selected.min ?? ''} onChange={e => patchField(selected.id, { min: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-min-${selected.id}`} /></Label><Label title="Maximum"><input className={inputClass} type="number" step={selected.type === 'number' ? 1 : 'any'} value={selected.max ?? ''} onChange={e => patchField(selected.id, { max: e.target.value === '' ? null : Number(e.target.value) })} data-testid={`input-field-max-${selected.id}`} /></Label></div>{selected.type === 'percent' && <small>Stored as a fraction: 0.25 is 25%.</small>}</div>}
+             {uploadTypes.has(selected.type) && <div className="fb-prop-group"><span className="fb-prop-label">UPLOAD RULES</span><label className="fb-switch-row"><span>Allow multiple files</span><input type="checkbox" checked={Boolean(selected.multiple)} onChange={e => patchField(selected.id, { multiple: e.target.checked, maxFiles: e.target.checked ? selected.maxFiles || 5 : 1 })} data-testid={`toggle-field-file-multiple-${selected.id}`} /></label><Label title="Accepted file types"><input className={inputClass} value={selected.accept || ''} onChange={e => patchField(selected.id, { accept: e.target.value || undefined })} placeholder={uploadAccept[selected.type] || ".pdf, .png"} data-testid={`input-field-accept-${selected.id}`} /></Label><div className="fb-two-inputs"><Label title="Max files"><input className={inputClass} type="number" min="1" max="10" value={selected.maxFiles || 1} onChange={e => patchField(selected.id, { maxFiles: Number(e.target.value) })} data-testid={`input-field-max-files-${selected.id}`} /></Label><Label title="Size · MB"><input className={inputClass} type="number" min="1" max="25" value={selected.maxFileSizeMB || 10} onChange={e => patchField(selected.id, { maxFileSizeMB: Number(e.target.value) })} data-testid={`input-field-max-size-${selected.id}`} /></Label></div></div>}
+             <div className="fb-prop-group"><span className="fb-prop-label">EXPRESSIONS</span><span className="fb-prop-hint">Safe AppSheet-style expressions. Reference fields as [Field label] and use only listed functions.</span>
+               {([['initialValueExpression', 'Initial value expression'], ['appFormula', 'App formula'], ['showIf', 'Show if'], ['requiredIf', 'Required if'], ['validIf', 'Valid if']] as const).map(([key, title]) => {
+                 const source = selected[key] || '';
+                 const check = source ? validateExpression(source, definition.fields) : null;
+                 return <Label key={key} title={title} hint={key === 'appFormula' ? 'Formula fields are read-only; the server recomputes their submitted value.' : undefined}><textarea className={`${inputClass} fb-options-input`} value={source} placeholder={key === 'showIf' ? ' [Status] = "Ready"' : 'IF([Amount] > 0, [Amount], 0)'} onChange={e => patchField(selected.id, { [key]: e.target.value || undefined })} data-testid={`input-expression-${key}-${selected.id}`} />{check && !check.valid && <small className="form-error">{check.error}</small>}{key === 'appFormula' && source && check?.valid && <small>Preview result: {String(expressionResult(source, definition.fields, previewValues, '—', previewUser))}</small>}<details className="fb-prop-hint"><summary>Function catalog · insert a function</summary>{expressionFunctions.map(fn => <button key={fn.name} type="button" className="fb-function-suggestion" title={`${fn.description} Example: ${fn.example}`} onClick={() => patchField(selected.id, { [key]: `${source}${source ? ' ' : ''}${fn.name}(` })}>{fn.signature}</button>)}</details></Label>;
+               })}
+               <Label title="Invalid answer message"><input className={inputClass} value={selected.invalidMessage || ''} onChange={e => patchField(selected.id, { invalidMessage: e.target.value || undefined })} placeholder="Explain what needs to change" data-testid={`input-invalid-message-${selected.id}`} /></Label>
+               <details className="fb-prop-hint"><summary>Function catalog</summary>{expressionFunctions.map(fn => <div key={fn.name}><b>{fn.signature}</b><small>{fn.description} Example: {fn.example}</small></div>)}</details>
+             </div>
             {selected.type !== 'checkbox' && <div className="fb-prop-group"><span className="fb-prop-label">APPEARANCE</span><span className="fb-prop-hint">Choose how much space the field occupies.</span><div className="fb-width-picker" role="group" aria-label="Field width">{[1, 2, 3, 4, 5, 6].map(width => <button type="button" className={(selected.width || 6) === width ? 'active' : ''} key={width} onClick={() => patchField(selected.id, { width })} aria-label={`${width} of 6 columns`} aria-pressed={(selected.width || 6) === width} data-testid={`button-field-width-${width}`}>{width}</button>)}</div><div className="fb-two-inputs"><Label title="Prefix"><input className={inputClass} value={selected.prefix || ''} onChange={e => patchField(selected.id, { prefix: e.target.value || undefined })} placeholder="$" data-testid={`input-field-prefix-${selected.id}`} /></Label><Label title="Suffix"><input className={inputClass} value={selected.suffix || ''} onChange={e => patchField(selected.id, { suffix: e.target.value || undefined })} placeholder="USD" data-testid={`input-field-suffix-${selected.id}`} /></Label></div></div>}
             <div className="fb-prop-group"><span className="fb-prop-label">DISPLAY CONDITION</span><Label title="Show this field when"><select className={inputClass} value={selected.displayCondition?.fieldId || ''} onChange={e => patchField(selected.id, { displayCondition: e.target.value ? { fieldId: e.target.value, operator: selected.displayCondition?.operator || 'equals', value: selected.displayCondition?.value || '' } : null })} data-testid={`select-field-condition-${selected.id}`}><option value="">Always visible</option>{definition.fields.filter(field => field.id !== selected.id).map(field => <option key={field.id} value={field.id}>{field.label || 'Untitled field'}</option>)}</select></Label>{selected.displayCondition && <><Label title="Condition"><select className={inputClass} value={selected.displayCondition.operator} onChange={e => patchField(selected.id, { displayCondition: { ...selected.displayCondition!, operator: e.target.value as NonNullable<WorkflowField['displayCondition']>['operator'] } })} data-testid={`select-field-condition-operator-${selected.id}`}><option value="equals">Equals</option><option value="notEquals">Does not equal</option><option value="contains">Contains</option></select></Label><Label title="Answer"><input className={inputClass} value={selected.displayCondition.value} onChange={e => patchField(selected.id, { displayCondition: { ...selected.displayCondition!, value: e.target.value } })} placeholder="Match value" data-testid={`input-field-condition-value-${selected.id}`} /></Label></>}</div>
           </div> : <div className="fb-properties-empty"><Settings2 size={20} /><b>Select a field</b><span>Choose a field on the canvas to edit its label, behavior, and validation.</span></div>}
@@ -280,16 +335,24 @@ export default function WorkflowEditor() {
 }
 
 function PreviewControl({ field, value, people, onChange, error }: { field: WorkflowField; value: unknown; people: Array<{ id: string; name: string }>; onChange: (value: unknown) => void; error?: string }) {
-  const common = { id: `test-${field.id}`, className: inputClass, placeholder: field.placeholder || '', disabled: Boolean(field.readOnly), 'aria-invalid': Boolean(error), 'data-testid': `preview-input-${field.id}` };
+  const common = { id: `test-${field.id}`, className: inputClass, placeholder: field.placeholder || (field.type === 'duration' ? 'HH:MM:SS' : ''), disabled: Boolean(field.readOnly || field.appFormula), 'aria-invalid': Boolean(error), 'data-testid': `preview-input-${field.id}` };
   const text = String(value ?? field.defaultValue ?? '');
   let control: ReactNode;
-  if (field.type === 'textarea') control = <textarea {...common} value={text} minLength={field.minLength ?? undefined} maxLength={field.maxLength ?? undefined} onChange={e => onChange(e.target.value)} />;
-  else if (field.type === 'select' || field.type === 'lookup') control = <select {...common} value={text} onChange={e => onChange(e.target.value)}><option value="">Choose an option</option>{(field.options || []).map(option => <option key={option} value={option}>{option}</option>)}</select>;
-  else if (field.type === 'multiselect') control = <select {...common} multiple value={Array.isArray(value) ? value as string[] : []} onChange={e => onChange(Array.from(e.target.selectedOptions, option => option.value))}>{(field.options || []).map(option => <option key={option} value={option}>{option}</option>)}</select>;
-  else if (field.type === 'radio') control = <div className="fb-preview-choice-list">{(field.options || []).map(option => <label key={option}><input type="radio" name={`radio-${field.id}`} value={option} checked={value === option} onChange={() => onChange(option)} data-testid={`preview-radio-${field.id}`} />{option}</label>)}</div>;
-  else if (field.type === 'checkbox') control = <label className="fb-preview-checkbox"><input type="checkbox" checked={value === true} onChange={e => onChange(e.target.checked)} disabled={Boolean(field.readOnly)} data-testid={`preview-input-${field.id}`} />{field.placeholder || 'Yes'}</label>;
-  else if (field.type === 'file') control = <input {...common} type="file" accept={field.accept || undefined} multiple={Boolean(field.multiple)} onChange={e => onChange(Array.from(e.target.files ?? [], file => file.name))} data-testid={`preview-input-${field.id}`} />;
+  if (field.type === 'show') return <div className="fb-prop-hint">{field.helpText || field.placeholder || field.label}</div>;
+  if (['textarea', 'longtext', 'address'].includes(field.type)) control = <textarea {...common} value={text} minLength={field.minLength ?? undefined} maxLength={field.maxLength ?? undefined} onChange={e => onChange(e.target.value)} />;
+  else if (['select', 'enum', 'lookup', 'ref', 'progress'].includes(field.type)) {
+    const options = field.type === 'progress' ? progressOptions : field.options || [];
+    control = <select {...common} value={text} onChange={e => onChange(e.target.value)}><option value="">Choose an option</option>{options.map(option => <option key={option} value={option}>{option}</option>)}</select>;
+  }
+  else if (['multiselect', 'enumlist'].includes(field.type)) control = <select {...common} multiple value={Array.isArray(value) ? value as string[] : []} onChange={e => onChange(Array.from(e.target.selectedOptions, option => option.value))}>{(field.options || []).map(option => <option key={option} value={option}>{option}</option>)}</select>;
+  else if (field.type === 'radio') control = <div className="fb-preview-choice-list">{(field.options || []).map(option => <label key={option}><input type="radio" name={`radio-${field.id}`} value={option} checked={value === option} disabled={Boolean(field.readOnly || field.appFormula)} onChange={() => onChange(option)} data-testid={`preview-radio-${field.id}`} />{option}</label>)}</div>;
+  else if (field.type === 'checkbox') control = <label className="fb-preview-checkbox"><input type="checkbox" checked={value === true} onChange={e => onChange(e.target.checked)} disabled={Boolean(field.readOnly || field.appFormula)} data-testid={`preview-input-${field.id}`} />{field.placeholder || 'Yes'}</label>;
+  else if (field.type === 'yesno') control = <div className="fb-preview-choice-list">{[['true', 'Yes'], ['false', 'No']].map(([choice, label]) => <label key={choice}><input type="radio" name={`yesno-${field.id}`} checked={String(value) === choice} disabled={Boolean(field.readOnly || field.appFormula)} onChange={() => onChange(choice === 'true')} data-testid={`preview-input-${field.id}-${choice}`} />{label}</label>)}</div>;
+  else if (uploadTypes.has(field.type)) control = <input {...common} type="file" accept={field.accept || uploadAccept[field.type]} multiple={Boolean(field.multiple)} onChange={e => onChange(Array.from(e.target.files ?? [], file => file.name))} data-testid={`preview-input-${field.id}`} />;
   else if (field.type === 'people') control = <select {...common} multiple={Boolean(field.multiple)} value={field.multiple ? Array.isArray(value) ? value as string[] : [] : text} onChange={e => onChange(field.multiple ? Array.from(e.target.selectedOptions, option => option.value) : e.target.value)}><option value="">Choose a person</option>{people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select>;
-  else control = <input {...common} type={field.type === 'datetime' ? 'datetime-local' : field.type === 'number' ? 'number' : field.type} value={text} min={field.type === 'number' ? field.min ?? undefined : undefined} max={field.type === 'number' ? field.max ?? undefined : undefined} minLength={field.minLength ?? undefined} maxLength={field.maxLength ?? undefined} onChange={e => onChange(e.target.value)} />;
+  else if (field.type === 'location' || field.type === 'latlong' || field.type === 'xy') control = <input {...common} type="text" value={text} placeholder={field.placeholder || 'Enter coordinates or location'} onChange={e => onChange(e.target.value)} />;
+  else if (field.type === 'percent') control = <div className="flex items-center gap-2"><input {...common} type="number" step="any" value={text === '' ? '' : String(Number(text) * 100)} min={field.min == null ? undefined : field.min * 100} max={field.max == null ? undefined : field.max * 100} onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value) / 100)} /><span>%</span></div>;
+  else if (field.type === 'color') control = <select {...common} value={text} onChange={e => onChange(e.target.value)}><option value="">Choose a color</option>{colorOptions.map(color => <option key={color} value={color}>{color}</option>)}{text && !colorOptions.includes(text) && <option value={text}>{text}</option>}</select>;
+  else control = <input {...common} type={field.type === 'datetime' ? 'datetime-local' : field.type === 'video' ? 'url' : ['number', 'decimal', 'price'].includes(field.type) ? 'number' : field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : field.type === 'url' ? 'url' : 'text'} step={field.type === 'number' ? 1 : 'any'} value={text} min={['number', 'decimal', 'price'].includes(field.type) ? field.min ?? undefined : undefined} max={['number', 'decimal', 'price'].includes(field.type) ? field.max ?? undefined : undefined} minLength={field.minLength ?? undefined} maxLength={field.maxLength ?? undefined} onChange={e => onChange(e.target.value)} />;
   return <>{control}{error && <span className="fb-preview-error" role="alert">{error}</span>}</>;
 }

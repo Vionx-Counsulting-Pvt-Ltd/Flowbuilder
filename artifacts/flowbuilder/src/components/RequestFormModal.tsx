@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -6,271 +6,326 @@ import {
   getGetReportOverviewQueryKey,
   getListRequestsQueryKey,
   useCreateRequest,
+  useGetCurrentUser,
   useListPeople,
   useRequestUploadUrl,
 } from "@workspace/api-client-react";
 import type { Workflow, WorkflowField } from "@workspace/api-client-react";
-import { ArrowRight, LoaderCircle, Paperclip, X } from "lucide-react";
+import { computeFormExpressions, evaluateExpression, type ExpressionContext, type ExpressionUser } from "@workspace/workflow-expressions";
+import { ArrowRight, LoaderCircle, MapPin, Paperclip, X } from "lucide-react";
 
-type UploadedWorkflowFile = {
-  fileId: string;
-  name: string;
-  contentType: string;
-  size: number;
-};
-
-const fieldId = (field: WorkflowField) => field.id;
-
-function isVisible(field: WorkflowField, values: Record<string, unknown>): boolean {
+type UploadedWorkflowFile = { fileId: string; name: string; contentType: string; size: number };
+const uploadTypes = new Set<WorkflowField["type"]>(["file", "image", "thumbnail", "drawing", "signature"]);
+const progressOptions = ["Empty", "Quarter", "Half", "Three Quarter", "Full"];
+const colorOptions = ["Black", "Blue", "Green", "Orange", "Purple", "Red", "Yellow", "White"];
+const expressionContext = (fields: WorkflowField[], values: Record<string, unknown>, user?: ExpressionUser): ExpressionContext => ({ fields, values, user });
+function evaluate(source: string | null | undefined, fields: WorkflowField[], values: Record<string, unknown>, fallback: unknown, user?: ExpressionUser): unknown {
+  if (!source?.trim()) return fallback;
+  try { return evaluateExpression(source, expressionContext(fields, values, user)); } catch { return fallback; }
+}
+function defaultValue(field: WorkflowField): unknown {
+  if (field.type === "checkbox") return field.defaultValue === "true";
+  if (field.type === "yesno") return field.defaultValue === "true" ? true : field.defaultValue === "false" ? false : "";
+  if (uploadTypes.has(field.type) || ["multiselect", "enumlist"].includes(field.type) || (field.type === "people" && field.multiple)) return [];
+  return field.defaultValue ?? "";
+}
+function initialValues(fields: WorkflowField[], user?: ExpressionUser): Record<string, unknown> {
+  const values: Record<string, unknown> = Object.fromEntries(fields.map(field => [field.id, defaultValue(field)]));
+  for (const field of fields) if (field.initialValueExpression?.trim()) delete values[field.id];
+  try { return computeFormExpressions(fields, values, user); } catch { return values; }
+}
+function isVisible(field: WorkflowField, fields: WorkflowField[], values: Record<string, unknown>, user?: ExpressionUser): boolean {
   if (field.hidden) return false;
+  if (field.showIf?.trim()) return Boolean(evaluate(field.showIf, fields, { ...values, _THIS: values[field.id] }, false, user));
   const condition = field.displayCondition;
   if (!condition) return true;
   const current = values[condition.fieldId];
-  const equals = Array.isArray(current)
-    ? current.some((item) => String(item) === condition.value)
-    : String(current ?? "") === condition.value;
-  if (condition.operator === "notEquals") return !equals;
-  if (condition.operator === "contains") {
-    return Array.isArray(current)
-      ? equals
-      : String(current ?? "").includes(condition.value);
-  }
-  return equals;
+  const matches = Array.isArray(current) ? current.some(item => String(item) === condition.value) : String(current ?? "") === condition.value;
+  if (condition.operator === "notEquals") return !matches;
+  if (condition.operator === "contains") return Array.isArray(current) ? matches : String(current ?? "").includes(condition.value);
+  return matches;
+}
+function isEmpty(value: unknown): boolean {
+  return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
 }
 
-function initialValue(field: WorkflowField): unknown {
-  if (field.type === "checkbox") return field.defaultValue === "true";
-  if (field.type === "file" || field.type === "multiselect" || (field.type === "people" && field.multiple)) return [];
-  return field.defaultValue ?? "";
-}
-
-export default function RequestFormModal({
-  workflows,
-  onClose,
+function DrawingCapture({
+  fieldType,
+  disabled,
+  onCapture,
 }: {
-  workflows: Workflow[];
-  onClose: () => void;
+  fieldType: "drawing" | "signature";
+  disabled: boolean;
+  onCapture: (file: File) => void;
 }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef(false);
+  const [hasInk, setHasInk] = useState(false);
+
+  function clear() {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height);
+    setHasInk(false);
+  }
+
+  function capture() {
+    const canvas = canvasRef.current;
+    if (!canvas || !hasInk) return;
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      onCapture(new File([blob], `${fieldType}-${timestamp}.png`, { type: "image/png" }));
+      clear();
+    }, "image/png");
+  }
+
+  return <div className="space-y-2">
+    <canvas
+      ref={canvasRef}
+      width={720}
+      height={220}
+      aria-label={fieldType === "signature" ? "Draw your signature" : "Draw on the canvas"}
+      data-testid={`canvas-${fieldType}`}
+      className="w-full rounded-lg border border-border bg-white touch-none"
+      style={{ height: 150, touchAction: "none" }}
+      onPointerDown={event => {
+        if (disabled) return;
+        const canvas = event.currentTarget;
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (event.clientX - rect.left) * canvas.width / rect.width;
+        const y = (event.clientY - rect.top) * canvas.height / rect.height;
+        context.beginPath();
+        context.moveTo(x, y);
+        context.lineWidth = 3;
+        context.lineCap = "round";
+        context.lineJoin = "round";
+        context.strokeStyle = "#172554";
+        drawing.current = true;
+        setHasInk(true);
+        canvas.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }}
+      onPointerMove={event => {
+        if (!drawing.current) return;
+        const canvas = event.currentTarget;
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        const rect = canvas.getBoundingClientRect();
+        context.lineTo(
+          (event.clientX - rect.left) * canvas.width / rect.width,
+          (event.clientY - rect.top) * canvas.height / rect.height,
+        );
+        context.stroke();
+      }}
+      onPointerUp={() => { drawing.current = false; }}
+      onPointerCancel={() => { drawing.current = false; }}
+      onLostPointerCapture={() => { drawing.current = false; }}
+    />
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" className="button button-outline" disabled={disabled || !hasInk} onClick={clear} data-testid={`button-clear-${fieldType}`}>Clear</button>
+      <button type="button" className="button button-primary" disabled={disabled || !hasInk} onClick={capture} data-testid={`button-save-${fieldType}`}>Save {fieldType}</button>
+      <span className="text-xs text-muted-foreground">Draw with a mouse, stylus, or touch.</span>
+    </div>
+  </div>;
+}
+
+export default function RequestFormModal({ workflows, onClose }: { workflows: Workflow[]; onClose: () => void }) {
   const queryClient = useQueryClient();
   const create = useCreateRequest();
+  const current = useGetCurrentUser();
   const upload = useRequestUploadUrl();
   const people = useListPeople();
+  const expressionUser = useMemo<ExpressionUser | undefined>(() => current.data
+    ? { email: current.data.email, name: current.data.name, role: current.data.roleName }
+    : undefined, [current.data?.email, current.data?.name, current.data?.roleName]);
   const [, setLocation] = useLocation();
-  const [workflowId, setWorkflowId] = useState(
-    workflows.find((workflow) => workflow.status === "active")?.id ?? "",
-  );
-  const selected = workflows.find((workflow) => workflow.id === workflowId);
+  const [workflowId, setWorkflowId] = useState(workflows.find(workflow => workflow.status === "active")?.id ?? "");
+  const selected = workflows.find(workflow => workflow.id === workflowId);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadError, setUploadError] = useState("");
   const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const [locatingField, setLocatingField] = useState<string | null>(null);
+  const computedValues = useMemo(() => {
+    const fields = selected?.fields ?? [];
+    try { return computeFormExpressions(fields, values, expressionUser); } catch { return values; }
+  }, [values, selected?.fields, expressionUser]);
 
   useEffect(() => {
-    setValues(
-      Object.fromEntries(
-        (selected?.fields ?? []).map((field) => [field.id, initialValue(field)]),
-      ),
-    );
+    if (current.isLoading) return;
+    setValues(initialValues(selected?.fields ?? [], expressionUser));
     setErrors({});
     setUploadError("");
-  }, [workflowId, selected?.id]);
+  }, [workflowId, selected?.id, expressionUser, current.isLoading]);
 
   function updateValue(id: string, value: unknown) {
-    setValues((current) => ({ ...current, [id]: value }));
-    setErrors((current) => ({ ...current, [id]: "" }));
+    setValues(current => ({ ...current, [id]: value }));
+    setErrors(current => ({ ...current, [id]: "" }));
   }
 
-  async function uploadFiles(field: WorkflowField, files: FileList | null) {
-    if (!files?.length) return;
-    const existing = Array.isArray(values[fieldId(field)])
-      ? (values[fieldId(field)] as UploadedWorkflowFile[])
-      : [];
+  async function uploadFiles(field: WorkflowField, fileList: FileList | File[] | null) {
+    if (!fileList?.length) return;
+    const existing = Array.isArray(values[field.id]) ? values[field.id] as UploadedWorkflowFile[] : [];
     const maxFiles = field.multiple ? field.maxFiles ?? 10 : 1;
-    const selectedFiles = Array.from(files);
+    const selectedFiles = Array.from(fileList);
     if (existing.length + selectedFiles.length > maxFiles) {
       setUploadError(`Choose up to ${maxFiles} file${maxFiles === 1 ? "" : "s"} for ${field.label}.`);
       return;
     }
     const maxSizeMB = field.maxFileSizeMB ?? 20;
-    const oversized = selectedFiles.find((file) => file.size > maxSizeMB * 1024 * 1024);
-    if (oversized) {
-      setUploadError(`${oversized.name} exceeds the ${maxSizeMB} MB limit.`);
-      return;
-    }
-
+    const oversized = selectedFiles.find(file => file.size > maxSizeMB * 1024 * 1024);
+    if (oversized) { setUploadError(`${oversized.name} exceeds the ${maxSizeMB} MB limit.`); return; }
     setUploadingField(field.id);
     setUploadError("");
     try {
       const completed: UploadedWorkflowFile[] = [];
       for (const file of selectedFiles) {
-        const response = await upload.mutateAsync({
-          data: {
-            name: file.name,
-            size: file.size,
-            contentType: file.type || "application/octet-stream",
-          },
-        });
-        const result = await fetch(response.uploadURL, {
-          method: "PUT",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
-          body: file,
-        });
+        const response = await upload.mutateAsync({ data: { name: file.name, size: file.size, contentType: file.type || "application/octet-stream" } });
+        const result = await fetch(response.uploadURL, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
         if (!result.ok) throw new Error(`Upload failed for ${file.name}.`);
-        completed.push({
-          fileId: response.fileId,
-          name: response.metadata.name,
-          contentType: response.metadata.contentType,
-          size: response.metadata.size,
-        });
+        completed.push({ fileId: response.fileId, name: response.metadata.name, contentType: response.metadata.contentType, size: response.metadata.size });
       }
-      setValues((current) => {
-        const currentFiles = Array.isArray(current[field.id])
-          ? (current[field.id] as UploadedWorkflowFile[])
-          : [];
-        return {
-          ...current,
-          [field.id]: field.multiple ? [...currentFiles, ...completed] : completed,
-        };
+      setValues(current => {
+        const currentFiles = Array.isArray(current[field.id]) ? current[field.id] as UploadedWorkflowFile[] : [];
+        return { ...current, [field.id]: field.multiple ? [...currentFiles, ...completed] : completed };
       });
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "The upload failed.");
-    } finally {
-      setUploadingField(null);
-    }
+    } finally { setUploadingField(null); }
+  }
+
+  function requestLocation(field: WorkflowField) {
+    if (!navigator.geolocation) { setErrors(current => ({ ...current, [field.id]: "Location is not available in this browser. Enter it manually." })); return; }
+    setLocatingField(field.id);
+    navigator.geolocation.getCurrentPosition(position => {
+      const { latitude, longitude } = position.coords;
+      updateValue(field.id, `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+      setLocatingField(null);
+    }, () => {
+      setErrors(current => ({ ...current, [field.id]: "Location permission was unavailable. Enter it manually." }));
+      setLocatingField(null);
+    }, { enableHighAccuracy: true, timeout: 10000 });
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return;
+    const fields = selected.fields;
     const nextErrors: Record<string, string> = {};
-    for (const field of selected.fields) {
-      if (!isVisible(field, values)) continue;
-      const value = values[field.id];
-      const empty =
-        value === undefined ||
-        value === null ||
-        value === "" ||
-        (Array.isArray(value) && value.length === 0);
-      if (field.required && (empty || (field.type === "checkbox" && value !== true))) {
+    for (const field of fields) {
+      if (!isVisible(field, fields, computedValues, expressionUser) || field.type === "show") continue;
+      const value = computedValues[field.id];
+      const required = field.required || Boolean(evaluate(field.requiredIf, fields, { ...computedValues, _THIS: value }, false, expressionUser));
+      if (required && (isEmpty(value) || (field.type === "checkbox" && value !== true))) {
         nextErrors[field.id] = "This field is required.";
+      } else if (field.validIf && !isEmpty(value)) {
+        const validation = evaluate(field.validIf, fields, { ...computedValues, _THIS: value }, false, expressionUser);
+        const valid = typeof validation === "boolean"
+          ? validation
+          : Array.isArray(validation)
+            ? (Array.isArray(value) ? value.every(item => validation.some(option => String(option) === String(item))) : validation.some(option => String(option) === String(value)))
+            : false;
+        if (!valid) nextErrors[field.id] = field.invalidMessage || "This answer is not valid.";
+      }
+      if (!nextErrors[field.id] && ["number", "decimal", "percent", "price"].includes(field.type) && !isEmpty(value) && !Number.isFinite(Number(value))) {
+        nextErrors[field.id] = "Enter a valid number.";
+      } else if (!nextErrors[field.id] && field.type === "number" && !isEmpty(value) && !Number.isInteger(Number(value))) {
+        nextErrors[field.id] = "Enter a whole number.";
+      } else if (!nextErrors[field.id] && field.type === "percent" && !isEmpty(value) && (Number(value) < 0 || Number(value) > 1)) {
+        nextErrors[field.id] = "Enter a fraction from 0 to 1 (for example, 0.25 for 25%).";
+      } else if (!nextErrors[field.id] && ["number", "decimal", "percent", "price"].includes(field.type) && !isEmpty(value) && field.min != null && Number(value) < field.min) {
+        nextErrors[field.id] = `Enter a number of at least ${field.min}.`;
+      } else if (!nextErrors[field.id] && ["number", "decimal", "percent", "price"].includes(field.type) && !isEmpty(value) && field.max != null && Number(value) > field.max) {
+        nextErrors[field.id] = `Enter a number no greater than ${field.max}.`;
+      } else if (!nextErrors[field.id] && typeof value === "string" && field.minLength != null && value.length < field.minLength) {
+        nextErrors[field.id] = `Use at least ${field.minLength} characters.`;
+      } else if (!nextErrors[field.id] && typeof value === "string" && field.maxLength != null && value.length > field.maxLength) {
+        nextErrors[field.id] = `Use no more than ${field.maxLength} characters.`;
       }
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length || uploadingField) return;
-
-    const formData = { ...values };
-    for (const field of selected.fields) {
-      if (field.readOnly) {
-        formData[field.id] =
-          field.type === "checkbox" ? field.defaultValue === "true" : field.defaultValue ?? "";
-      }
-    }
-    for (const field of selected.fields) {
-      if (!isVisible(field, formData)) delete formData[field.id];
-    }
-
-    create.mutate(
-      { data: { workflowId, formData } },
-      {
-        onSuccess: (request) => {
-          void queryClient.invalidateQueries({ queryKey: getListRequestsQueryKey() });
-          void queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
-          void queryClient.invalidateQueries({ queryKey: getGetReportOverviewQueryKey() });
-          onClose();
-          setLocation(`/requests/${request.id}`);
-        },
+    const formData: Record<string, unknown> = { ...computedValues };
+    for (const field of fields) if (field.type === "show" || !isVisible(field, fields, computedValues, expressionUser)) delete formData[field.id];
+    create.mutate({ data: { workflowId, formData } }, {
+      onSuccess: request => {
+        void queryClient.invalidateQueries({ queryKey: getListRequestsQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getGetReportOverviewQueryKey() });
+        onClose();
+        setLocation(`/requests/${request.id}`);
       },
-    );
+    });
   }
 
-  return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="modal-panel w-full max-w-2xl" role="dialog" aria-modal="true" aria-labelledby="request-modal-title">
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
-          <div>
-            <span className="section-label">NEW WORKFLOW REQUEST</span>
-            <h2 id="request-modal-title" className="mt-1 text-xl font-semibold">Start a request</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Choose a workflow and share the context your approvers need.</p>
-          </div>
-          <button type="button" className="icon-button" aria-label="Close request form" data-testid="button-close-request-form" onClick={onClose}><X size={18} /></button>
-        </div>
-        <form onSubmit={submit} className="max-h-[75dvh] space-y-4 overflow-y-auto px-6 py-5">
-          <label className="form-field">
-            <span>Workflow</span>
-            <select className="input-control" data-testid="select-request-workflow" value={workflowId} onChange={(event) => setWorkflowId(event.target.value)} required>
-              <option value="">Choose a workflow</option>
-              {workflows.filter((workflow) => workflow.status === "active").map((workflow) => (
-                <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>
-              ))}
-            </select>
-          </label>
+  function renderControl(field: WorkflowField, value: unknown, disabled: boolean, required: boolean): ReactNode {
+    const options = field.type === "progress" ? progressOptions : field.options ?? [];
+    const dataTestId = `input-request-${field.id}`;
+    const onChange = (next: unknown) => updateValue(field.id, next);
+    const numeric = ["number", "decimal", "percent", "price"].includes(field.type);
+    if (["textarea", "longtext", "address"].includes(field.type)) return <textarea id={`request-${field.id}`} className="input-control min-h-24" data-testid={dataTestId} disabled={disabled} value={String(value ?? "")} placeholder={field.placeholder ?? ""} onChange={event => onChange(event.target.value)} />;
+    if (field.type === "checkbox") return <label className="flex items-center gap-2 text-sm"><input id={`request-${field.id}`} data-testid={dataTestId} type="checkbox" disabled={disabled} checked={value === true} onChange={event => onChange(event.target.checked)} />{field.placeholder || "Yes"}</label>;
+    if (field.type === "yesno") return <div className="flex gap-4">{[["true", "Yes"], ["false", "No"]].map(([choice, label]) => <label key={choice} className="flex items-center gap-2 text-sm"><input type="radio" name={field.id} data-testid={`${dataTestId}-${choice}`} disabled={disabled} checked={String(value) === choice} onChange={() => onChange(choice === "true")} />{label}</label>)}</div>;
+    if (field.type === "color") return <select id={`request-${field.id}`} className="input-control" data-testid={dataTestId} disabled={disabled} required={required} value={String(value ?? "")} onChange={event => onChange(event.target.value)}><option value="">Choose a color</option>{colorOptions.map(color => <option key={color} value={color}>{color}</option>)}{!isEmpty(value) && !colorOptions.includes(String(value)) && <option value={String(value)}>{String(value)}</option>}</select>;
+    if (["select", "enum", "lookup", "ref", "people", "progress"].includes(field.type)) {
+      const multiple = field.type === "people" && Boolean(field.multiple);
+      return <select id={`request-${field.id}`} className="input-control" data-testid={dataTestId} disabled={disabled} required={required && !multiple} multiple={multiple} value={multiple ? Array.isArray(value) ? value as string[] : [] : String(value ?? "")} onChange={event => onChange(multiple ? Array.from(event.target.selectedOptions, option => option.value) : event.target.value)}>
+        {!multiple && <option value="">{field.type === "people" ? "Choose a person" : "Choose an option"}</option>}
+        {field.type === "people" ? people.data?.map(person => <option key={person.id} value={person.id}>{person.name}</option>) : options.map(option => <option key={option} value={option}>{option}</option>)}
+      </select>;
+    }
+    if (field.type === "multiselect" || field.type === "enumlist") return <select id={`request-${field.id}`} className="input-control min-h-24" data-testid={dataTestId} disabled={disabled} multiple value={Array.isArray(value) ? value as string[] : []} onChange={event => onChange(Array.from(event.target.selectedOptions, option => option.value))}>{options.map(option => <option key={option} value={option}>{option}</option>)}</select>;
+    if (field.type === "radio") return <div className="space-y-2">{options.map(option => <label key={option} className="flex items-center gap-2 text-sm"><input data-testid={`${dataTestId}-${option}`} type="radio" name={field.id} disabled={disabled} checked={value === option} onChange={() => onChange(option)} />{option}</label>)}</div>;
+    if (uploadTypes.has(field.type)) {
+      const files = Array.isArray(value) ? value as UploadedWorkflowFile[] : [];
+      const isImage = ["image", "thumbnail", "drawing", "signature"].includes(field.type);
+      const accept = field.accept || (isImage ? "image/*" : undefined);
+      return <div className="space-y-2">
+        {(field.type === "drawing" || field.type === "signature") && <DrawingCapture fieldType={field.type} disabled={disabled || uploadingField === field.id} onCapture={file => void uploadFiles(field, [file])} />}
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm">
+          {uploadingField === field.id ? <LoaderCircle className="animate-spin" size={16} /> : <Paperclip size={16} />}
+          {uploadingField === field.id ? "Uploading…" : ["signature", "drawing"].includes(field.type) ? "Or upload an image" : "Choose file"}
+          <input className="sr-only" data-testid={dataTestId} type="file" disabled={disabled || uploadingField === field.id} multiple={Boolean(field.multiple)} accept={accept} onChange={event => { const selectedFiles = event.currentTarget.files; event.currentTarget.value = ""; void uploadFiles(field, selectedFiles); }} />
+        </label>
+        <p className="text-xs text-muted-foreground">{["drawing", "signature"].includes(field.type) ? "Captured or uploaded image is stored privately in this workspace." : "Private workspace upload."} · up to {field.multiple ? field.maxFiles ?? 10 : 1} file{field.multiple ? "s" : ""} · {field.maxFileSizeMB ?? 20} MB each.</p>
+        {files.map(file => <div key={file.fileId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"><span className="truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="text-destructive" data-testid={`remove-upload-${field.id}-${file.fileId}`} onClick={() => onChange(files.filter(item => item.fileId !== file.fileId))}>Remove</button></div>)}
+      </div>;
+    }
+    if (["location", "latlong", "xy"].includes(field.type)) return <div className="flex gap-2"><input className="input-control" data-testid={dataTestId} type="text" disabled={disabled} value={String(value ?? "")} placeholder={field.placeholder || (field.type === "xy" ? "X, Y" : "Latitude, longitude")} onChange={event => onChange(event.target.value)} />{field.type !== "xy" && <button type="button" className="button button-outline shrink-0" disabled={disabled || locatingField === field.id} onClick={() => requestLocation(field)} aria-label="Use browser location">{locatingField === field.id ? <LoaderCircle size={15} className="animate-spin" /> : <MapPin size={15} />}</button>}</div>;
+    if (field.type === "percent") return <div className="flex items-center gap-2"><input id={`request-${field.id}`} className="input-control" data-testid={dataTestId} type="number" step="any" disabled={disabled} required={required} min={field.min == null ? undefined : field.min * 100} max={field.max == null ? undefined : field.max * 100} value={isEmpty(value) ? "" : String(Number(value) * 100)} placeholder={field.placeholder ?? ""} onChange={event => onChange(event.target.value === "" ? "" : Number(event.target.value) / 100)} /><span>%</span></div>;
+    const inputType = field.type === "datetime" ? "datetime-local" : field.type === "video" ? "url" : field.type === "phone" ? "tel" : ["email", "url", "date", "time"].includes(field.type) ? field.type : numeric ? "number" : "text";
+    return <input id={`request-${field.id}`} className="input-control" data-testid={dataTestId} type={inputType} step={field.type === "number" ? 1 : numeric ? "any" : undefined} disabled={disabled} required={required} min={numeric ? field.min ?? undefined : undefined} max={numeric ? field.max ?? undefined : undefined} minLength={field.minLength ?? undefined} maxLength={field.maxLength ?? undefined} value={String(value ?? "")} placeholder={field.placeholder ?? (field.type === "duration" ? "HH:MM:SS" : "")} onChange={event => onChange(event.target.value)} />;
+  }
 
-          {selected?.fields.filter((field) => isVisible(field, values)).map((field) => {
-            const value = values[field.id];
-            const disabled = Boolean(field.readOnly);
-            const options = field.options ?? [];
-            const onChange = (next: unknown) => updateValue(field.id, next);
-            let control;
-
-            if (field.type === "textarea") {
-              control = <textarea className="input-control min-h-24" data-testid={`input-request-${field.id}`} disabled={disabled} value={String(value ?? "")} placeholder={field.placeholder ?? ""} onChange={(event) => onChange(event.target.value)} />;
-            } else if (field.type === "checkbox") {
-              control = <input data-testid={`input-request-${field.id}`} type="checkbox" disabled={disabled} checked={value === true} onChange={(event) => onChange(event.target.checked)} />;
-            } else if (field.type === "select" || field.type === "lookup" || field.type === "people") {
-              const multiple = field.type === "people" && Boolean(field.multiple);
-              control = (
-                <select className="input-control" data-testid={`input-request-${field.id}`} disabled={disabled} required={field.required && !multiple} multiple={multiple} value={multiple ? (Array.isArray(value) ? value as string[] : []) : String(value ?? "")} onChange={(event) => onChange(multiple ? Array.from(event.target.selectedOptions, (option) => option.value) : event.target.value)}>
-                  {!multiple && <option value="">{field.type === "people" ? "Choose a person" : "Choose an option"}</option>}
-                  {field.type === "people"
-                    ? people.data?.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)
-                    : options.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-              );
-            } else if (field.type === "multiselect") {
-              control = <select className="input-control min-h-24" data-testid={`input-request-${field.id}`} disabled={disabled} multiple value={Array.isArray(value) ? value as string[] : []} onChange={(event) => onChange(Array.from(event.target.selectedOptions, (option) => option.value))}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>;
-            } else if (field.type === "radio") {
-              control = <div className="space-y-2">{options.map((option) => <label key={option} className="flex items-center gap-2 text-sm"><input data-testid={`input-request-${field.id}-${option}`} type="radio" name={field.id} disabled={disabled} checked={value === option} onChange={() => onChange(option)} />{option}</label>)}</div>;
-            } else if (field.type === "file") {
-              const files = Array.isArray(value) ? value as UploadedWorkflowFile[] : [];
-              control = (
-                <div className="space-y-2">
-                  <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm">
-                    {uploadingField === field.id ? <LoaderCircle className="animate-spin" size={16} /> : <Paperclip size={16} />}
-                    {uploadingField === field.id ? "Uploading…" : "Choose file"}
-                    <input className="sr-only" data-testid={`input-request-${field.id}`} type="file" disabled={disabled || uploadingField === field.id} multiple={Boolean(field.multiple)} accept={field.accept ?? undefined} onChange={(event) => { const selectedFiles = event.currentTarget.files; event.currentTarget.value = ""; void uploadFiles(field, selectedFiles); }} />
-                  </label>
-                  <p className="text-xs text-muted-foreground">Up to {field.multiple ? field.maxFiles ?? 10 : 1} file{field.multiple ? "s" : ""}, {field.maxFileSizeMB ?? 20} MB each. Files are private to this workspace.</p>
-                  {files.map((file) => <div key={file.fileId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"><span className="truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="text-destructive" data-testid={`remove-upload-${field.id}-${file.fileId}`} onClick={() => onChange(files.filter((item) => item.fileId !== file.fileId))}>Remove</button></div>)}
-                </div>
-              );
-            } else {
-              const inputType = field.type === "datetime" ? "datetime-local" : field.type;
-              control = <input className="input-control" data-testid={`input-request-${field.id}`} type={inputType} disabled={disabled} required={field.required} min={field.type === "number" ? field.min ?? undefined : undefined} max={field.type === "number" ? field.max ?? undefined : undefined} minLength={field.minLength ?? undefined} maxLength={field.maxLength ?? undefined} value={String(value ?? "")} placeholder={field.placeholder ?? ""} onChange={(event) => onChange(event.target.value)} />;
-            }
-
-            return (
-              <label className="form-field block" key={field.id}>
-                <span>{field.label}{field.required ? " *" : ""}</span>
-                {field.prefix || field.suffix
-                  ? <div className="flex items-center gap-2">{field.prefix && <span className="text-xs text-muted-foreground">{field.prefix}</span>}{control}{field.suffix && <span className="text-xs text-muted-foreground">{field.suffix}</span>}</div>
-                  : control}
-                {field.helpText && <small>{field.helpText}</small>}
-                {errors[field.id] && <small className="form-error" data-testid={`error-request-${field.id}`}>{errors[field.id]}</small>}
-              </label>
-            );
-          })}
-
-          {!selected && <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">{workflows.length ? "Select an active workflow to see its form." : "There are no active workflows yet."}</p>}
-          {uploadError && <p className="form-error" data-testid="status-upload-error">{uploadError}</p>}
-          {create.isError && <p className="form-error" data-testid="status-request-error">Could not submit this request. Please check the fields and try again.</p>}
-          <div className="modal-actions border-t border-border pt-4">
-            <button type="button" className="button button-quiet" onClick={onClose}>Cancel</button>
-            <button type="submit" className="button button-primary" data-testid="button-submit-request" disabled={!selected || create.isPending || Boolean(uploadingField)}>
-              {create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} />
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
+  return <div className="modal-backdrop" role="presentation">
+    <section className="modal-panel w-full max-w-2xl" role="dialog" aria-modal="true" aria-labelledby="request-modal-title">
+      <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
+        <div><span className="section-label">NEW WORKFLOW REQUEST</span><h2 id="request-modal-title" className="mt-1 text-xl font-semibold">Start a request</h2><p className="mt-1 text-sm text-muted-foreground">Choose a workflow and share the context your approvers need.</p></div>
+        <button type="button" className="icon-button" aria-label="Close request form" data-testid="button-close-request-form" onClick={onClose}><X size={18} /></button>
+      </div>
+      <form onSubmit={submit} className="max-h-[75dvh] space-y-4 overflow-y-auto px-6 py-5">
+        <label className="form-field"><span>Workflow</span><select className="input-control" data-testid="select-request-workflow" value={workflowId} onChange={event => setWorkflowId(event.target.value)} required><option value="">Choose a workflow</option>{workflows.filter(workflow => workflow.status === "active").map(workflow => <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>)}</select></label>
+        {selected?.fields.filter(field => isVisible(field, selected.fields, computedValues, expressionUser)).map(field => {
+          const value = computedValues[field.id];
+          const required = field.required || Boolean(evaluate(field.requiredIf, selected.fields, { ...computedValues, _THIS: value }, false, expressionUser));
+          if (field.type === "show") return <div key={field.id} className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm" data-testid={`show-request-${field.id}`}><strong>{field.label}</strong>{field.helpText && <p className="mt-1 text-muted-foreground">{field.helpText}</p>}{field.placeholder && <p className="mt-1">{field.placeholder}</p>}</div>;
+          const disabled = Boolean(field.readOnly || field.appFormula);
+          return <div className="form-field block" key={field.id}>
+            <label htmlFor={`request-${field.id}`}><span>{field.label}{required ? " *" : ""}</span></label>
+            {field.prefix || field.suffix ? <div className="flex items-center gap-2">{field.prefix && <span className="text-xs text-muted-foreground">{field.prefix}</span>}{renderControl(field, value, disabled, required)}{field.suffix && <span className="text-xs text-muted-foreground">{field.suffix}</span>}</div> : renderControl(field, value, disabled, required)}
+            {field.appFormula && <small>Calculated automatically; the server recomputes this value on submission.</small>}
+            {field.helpText && <small>{field.helpText}</small>}
+            {errors[field.id] && <small className="form-error" data-testid={`error-request-${field.id}`}>{errors[field.id]}</small>}
+          </div>;
+        })}
+        {!selected && <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">{workflows.length ? "Select an active workflow to see its form." : "There are no active workflows yet."}</p>}
+        {uploadError && <p className="form-error" data-testid="status-upload-error">{uploadError}</p>}
+        {create.isError && <p className="form-error" data-testid="status-request-error">Could not submit this request. Please check the fields and try again.</p>}
+        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-quiet" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary" data-testid="button-submit-request" disabled={!selected || create.isPending || Boolean(uploadingField)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
+      </form>
+    </section>
+  </div>;
 }

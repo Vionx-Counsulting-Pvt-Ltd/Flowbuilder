@@ -16,17 +16,42 @@ export type WorkflowField = {
   type:
     | "text"
     | "textarea"
+    | "longtext"
+    | "name"
+    | "email"
+    | "phone"
+    | "url"
+    | "address"
     | "number"
+    | "decimal"
+    | "percent"
+    | "price"
     | "date"
     | "time"
     | "datetime"
+    | "duration"
     | "select"
+    | "enum"
     | "multiselect"
+    | "enumlist"
     | "checkbox"
+    | "yesno"
     | "radio"
+    | "progress"
+    | "ref"
     | "file"
+    | "image"
+    | "thumbnail"
+    | "drawing"
+    | "signature"
+    | "video"
     | "people"
-    | "lookup";
+    | "lookup"
+    | "color"
+    | "latlong"
+    | "location"
+    | "xy"
+    | "show";
   required: boolean;
   key?: string | null;
   placeholder?: string | null;
@@ -34,6 +59,12 @@ export type WorkflowField = {
   readOnly?: boolean;
   hidden?: boolean;
   defaultValue?: string | null;
+  initialValueExpression?: string | null;
+  appFormula?: string | null;
+  showIf?: string | null;
+  requiredIf?: string | null;
+  validIf?: string | null;
+  invalidMessage?: string | null;
   width?: number;
   prefix?: string | null;
   suffix?: string | null;

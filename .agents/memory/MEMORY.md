@@ -1,0 +1,1 @@
+- [FlowBuilder form scope](appsheet-form-scope.md) — builders are Admins + Developer role; keep AppSheet compatibility focused on user-entered forms.

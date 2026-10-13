@@ -22,7 +22,7 @@ catalogs:
       specifier: ^5.90.21
       version: 5.102.8
     '@types/node':
-      specifier: ^25.3.3
+      specifier: 25.9.6
       version: 25.9.6
     '@types/react':
       specifier: ^19.2.0
@@ -186,6 +186,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/workflow-expressions':
+        specifier: workspace:*
+        version: link:../../lib/workflow-expressions
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -241,6 +244,9 @@ importers:
       '@clerk/themes':
         specifier: ^2.4.57
         version: 2.4.57(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
+      '@workspace/workflow-expressions':
+        specifier: workspace:*
+        version: link:../../lib/workflow-expressions
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -657,6 +663,15 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+
+  lib/workflow-expressions:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.6
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.13
 
   scripts:
     devDependencies:

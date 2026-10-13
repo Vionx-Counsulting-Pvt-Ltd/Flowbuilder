@@ -482,7 +482,7 @@ components:
       properties:
         id: { type: string }
         label: { type: string }
-        type: { type: string, enum: [text, textarea, number, date, time, datetime, select, multiselect, checkbox, radio, file, people, lookup] }
+        type: { type: string, enum: [text, textarea, longtext, name, email, phone, url, address, number, decimal, percent, price, date, time, datetime, duration, select, enum, multiselect, enumlist, checkbox, yesno, radio, progress, ref, file, image, thumbnail, drawing, signature, video, people, lookup, color, latlong, location, xy, show] }
         required: { type: boolean }
         placeholder: { type: ["string", "null"] }
         options:
@@ -493,6 +493,12 @@ components:
         readOnly: { type: boolean }
         hidden: { type: boolean }
         defaultValue: { type: ["string", "null"] }
+        initialValueExpression: { type: ["string", "null"] }
+        appFormula: { type: ["string", "null"] }
+        showIf: { type: ["string", "null"] }
+        requiredIf: { type: ["string", "null"] }
+        validIf: { type: ["string", "null"] }
+        invalidMessage: { type: ["string", "null"] }
         width: { type: integer, minimum: 1, maximum: 6 }
         prefix: { type: ["string", "null"] }
         suffix: { type: ["string", "null"] }

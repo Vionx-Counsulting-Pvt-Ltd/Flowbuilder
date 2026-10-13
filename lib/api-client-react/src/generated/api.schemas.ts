@@ -45,17 +45,42 @@ export type WorkflowFieldType = typeof WorkflowFieldType[keyof typeof WorkflowFi
 export const WorkflowFieldType = {
   text: 'text',
   textarea: 'textarea',
+  longtext: 'longtext',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  url: 'url',
+  address: 'address',
   number: 'number',
+  decimal: 'decimal',
+  percent: 'percent',
+  price: 'price',
   date: 'date',
   time: 'time',
   datetime: 'datetime',
+  duration: 'duration',
   select: 'select',
+  enum: 'enum',
   multiselect: 'multiselect',
+  enumlist: 'enumlist',
   checkbox: 'checkbox',
+  yesno: 'yesno',
   radio: 'radio',
+  progress: 'progress',
+  ref: 'ref',
   file: 'file',
+  image: 'image',
+  thumbnail: 'thumbnail',
+  drawing: 'drawing',
+  signature: 'signature',
+  video: 'video',
   people: 'people',
   lookup: 'lookup',
+  color: 'color',
+  latlong: 'latlong',
+  location: 'location',
+  xy: 'xy',
+  show: 'show',
 } as const;
 
 export type FieldConditionOperator = typeof FieldConditionOperator[keyof typeof FieldConditionOperator];
@@ -89,6 +114,18 @@ export interface WorkflowField {
   hidden?: boolean;
   /** @nullable */
   defaultValue?: string | null;
+  /** @nullable */
+  initialValueExpression?: string | null;
+  /** @nullable */
+  appFormula?: string | null;
+  /** @nullable */
+  showIf?: string | null;
+  /** @nullable */
+  requiredIf?: string | null;
+  /** @nullable */
+  validIf?: string | null;
+  /** @nullable */
+  invalidMessage?: string | null;
   /**
      * @minimum 1
      * @maximum 6

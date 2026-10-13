@@ -63,6 +63,13 @@ import {
   usersTable,
   workflowsTable,
 } from "@workspace/db";
+import {
+  computeFormExpressions,
+  evaluateExpression,
+  expressionIsTrue,
+  getExpressionReferences,
+  validateExpression,
+} from "@workspace/workflow-expressions";
 import { Router, type IRouter, type Response } from "express";
 import {
   currentMember,
@@ -155,6 +162,48 @@ function groupedStages(stages: WorkflowStage[]): number[] {
   );
 }
 
+const choiceFieldTypes = new Set([
+  "select", "enum", "multiselect", "enumlist", "radio", "lookup", "progress", "ref",
+]);
+const progressOptions = new Set(["Empty", "Quarter", "Half", "Three Quarter", "Full"]);
+const appSheetColors = new Set(["Black", "Blue", "Green", "Orange", "Purple", "Red", "Yellow", "White"]);
+const uploadFieldTypes = new Set(["file", "image", "thumbnail", "drawing", "signature"]);
+
+function formulaDependencyError(fields: WorkflowField[]): string | null {
+  const formulaFields = fields.filter((field) => field.appFormula?.trim() || field.initialValueExpression?.trim());
+  const formulasById = new Map(formulaFields.map((field) => [field.id, field]));
+  const fieldsByName = new Map<string, WorkflowField>();
+  for (const field of fields) {
+    for (const name of [field.id, field.key, field.label]) {
+      if (name?.trim()) fieldsByName.set(name.trim().toLocaleLowerCase(), field);
+    }
+  }
+  const dependencies = new Map<string, Set<string>>();
+  for (const field of formulaFields) {
+    const expression = field.appFormula?.trim() || field.initialValueExpression!;
+    const refs = getExpressionReferences(expression);
+    dependencies.set(field.id, new Set(refs
+      .map((reference) => fieldsByName.get(reference.toLocaleLowerCase())?.id)
+      .filter((id): id is string => Boolean(id && formulasById.has(id)))));
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string): boolean => {
+    if (visiting.has(id)) return true;
+    if (visited.has(id)) return false;
+    visiting.add(id);
+    for (const dependency of dependencies.get(id) ?? []) {
+      if (visit(dependency)) return true;
+    }
+    visiting.delete(id);
+    visited.add(id);
+    return false;
+  };
+  return formulaFields.some((field) => visit(field.id))
+    ? "Computed fields cannot depend on each other in a loop."
+    : null;
+}
+
 function workflowDefinitionError(
   fields: WorkflowField[],
   stages: WorkflowStage[],
@@ -183,7 +232,7 @@ function workflowDefinitionError(
     if (field.width !== undefined && (!Number.isInteger(field.width) || field.width < 1 || field.width > 6)) {
       return `Set a valid width for “${label}”.`;
     }
-    if (["select", "multiselect", "radio", "lookup"].includes(field.type)) {
+    if (choiceFieldTypes.has(field.type) && field.type !== "progress") {
       const options = (field.options ?? [])
         .map((option) => option.trim())
         .filter(Boolean);
@@ -200,6 +249,19 @@ function workflowDefinitionError(
       !fields.some((candidate) => candidate.id === field.displayCondition?.fieldId)
     ) {
       return `Choose an existing field for the display condition on “${label}”.`;
+    }
+    if (requirePublish) {
+      for (const [property, expression] of [
+        ["initial value", field.initialValueExpression],
+        ["computed value", field.appFormula],
+        ["visibility", field.showIf],
+        ["required rule", field.requiredIf],
+        ["validation", field.validIf],
+      ] as const) {
+        if (!expression?.trim()) continue;
+        const validation = validateExpression(expression, fields);
+        if (!validation.valid) return `The ${property} expression for “${label}” is invalid: ${validation.error}`;
+      }
     }
     if (
       field.min !== undefined &&
@@ -218,6 +280,15 @@ function workflowDefinitionError(
       field.minLength > field.maxLength
     ) {
       return `The minimum length for “${label}” must not exceed its maximum length.`;
+    }
+  }
+
+  if (requirePublish) {
+    try {
+      const formulaError = formulaDependencyError(fields);
+      if (formulaError) return formulaError;
+    } catch (error) {
+      return error instanceof Error ? error.message : "A computed field expression is invalid.";
     }
   }
 
@@ -244,9 +315,22 @@ function workflowDefinitionError(
 
 function isFieldVisible(
   field: WorkflowField,
+  fields: WorkflowField[],
   formData: Record<string, unknown>,
+  member?: MemberContext,
 ): boolean {
   if (field.hidden) return false;
+  if (field.showIf?.trim()) {
+    try {
+      return expressionIsTrue(field.showIf, {
+        fields,
+        values: { ...formData, _THIS: formData[field.id] },
+        user: member ? { email: member.email, name: member.name, role: member.roleName } : undefined,
+      });
+    } catch {
+      return false;
+    }
+  }
   const condition = field.displayCondition;
   if (!condition) return true;
   const currentValue = formData[condition.fieldId];
@@ -265,24 +349,37 @@ function isFieldVisible(
 function formSubmissionError(
   fields: WorkflowField[],
   formData: Record<string, unknown>,
+  member: MemberContext,
 ): string | null {
   for (const field of fields) {
-    if (!isFieldVisible(field, formData)) continue;
+    if (field.type === "show" || !isFieldVisible(field, fields, formData, member)) continue;
     const value = formData[field.id];
     const empty =
       value === undefined ||
       value === null ||
       (typeof value === "string" && value.trim() === "") ||
       (Array.isArray(value) && value.length === 0);
+    let conditionallyRequired = false;
+    if (field.requiredIf?.trim()) {
+      try {
+        conditionallyRequired = expressionIsTrue(field.requiredIf, {
+          fields,
+        values: { ...formData, _THIS: formData[field.id] },
+          user: { email: member.email, name: member.name, role: member.roleName },
+        });
+      } catch {
+        return `The required rule for ${field.label} could not be evaluated.`;
+      }
+    }
     if (
-      field.required &&
+      (field.required || conditionallyRequired) &&
       (empty || (field.type === "checkbox" && value !== true))
     ) {
       return `${field.label} is required.`;
     }
     if (empty) continue;
 
-    if (field.type === "text" || field.type === "textarea") {
+    if (["text", "textarea", "longtext", "name", "email", "phone", "url", "address", "duration"].includes(field.type)) {
       if (typeof value !== "string") {
         return `${field.label} must be text.`;
       }
@@ -292,7 +389,24 @@ function formSubmissionError(
       if (field.maxLength && value.length > field.maxLength) {
         return `${field.label} is too long.`;
       }
-    } else if (field.type === "number") {
+      if (field.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        return `${field.label} must be a valid email address.`;
+      }
+      if (field.type === "phone" && !/^\+?[\d\s().-]{5,25}$/.test(value)) {
+        return `${field.label} must be a valid phone number.`;
+      }
+      if (field.type === "duration" && !/^-?\d{1,4}:[0-5]\d(?::[0-5]\d)?$/.test(value)) {
+        return `${field.label} must be entered as hours and minutes.`;
+      }
+      if (field.type === "url") {
+        try {
+          const url = new URL(value);
+          if (!["http:", "https:"].includes(url.protocol)) return `${field.label} must be a valid web address.`;
+        } catch {
+          return `${field.label} must be a valid web address.`;
+        }
+      }
+    } else if (["number", "decimal", "price", "percent"].includes(field.type)) {
       const numberValue =
         typeof value === "number"
           ? value
@@ -301,6 +415,12 @@ function formSubmissionError(
             : Number.NaN;
       if (!Number.isFinite(numberValue)) {
         return `${field.label} must be a valid number.`;
+      }
+      if (field.type === "number" && !Number.isInteger(numberValue)) {
+        return `${field.label} must be a whole number.`;
+      }
+      if (field.type === "percent" && (numberValue < 0 || numberValue > 1)) {
+        return `${field.label} must be between 0 and 1 (for example, 0.25 for 25%).`;
       }
       if (field.min !== undefined && field.min !== null && numberValue < field.min) {
         return `${field.label} must be at least ${field.min}.`;
@@ -332,22 +452,26 @@ function formSubmissionError(
       ) {
         return `${field.label} must be a valid date and time.`;
       }
-    } else if (["select", "radio", "lookup"].includes(field.type)) {
+    } else if (field.type === "progress") {
+      if (typeof value !== "string" || !progressOptions.has(value)) {
+        return `${field.label} must be a valid progress value.`;
+      }
+    } else if (choiceFieldTypes.has(field.type) && !["multiselect", "enumlist"].includes(field.type)) {
       if (
         typeof value !== "string" ||
         !(field.options ?? []).includes(value)
       ) {
         return `Choose a valid option for ${field.label}.`;
       }
-    } else if (field.type === "multiselect") {
+    } else if (field.type === "multiselect" || field.type === "enumlist") {
       if (
         !Array.isArray(value) ||
         value.some((item) => typeof item !== "string" || !(field.options ?? []).includes(item))
       ) {
         return `Choose valid options for ${field.label}.`;
       }
-    } else if (field.type === "checkbox" && typeof value !== "boolean") {
-      return `${field.label} must be checked or unchecked.`;
+    } else if ((field.type === "checkbox" || field.type === "yesno") && typeof value !== "boolean") {
+      return `${field.label} must be true or false.`;
     } else if (field.type === "people") {
       const choices = Array.isArray(value) ? value : [value];
       if (
@@ -357,7 +481,7 @@ function formSubmissionError(
       ) {
         return `Choose valid people for ${field.label}.`;
       }
-    } else if (field.type === "file") {
+    } else if (uploadFieldTypes.has(field.type)) {
       const maxFiles = field.multiple ? field.maxFiles ?? 10 : 1;
       if (
         !Array.isArray(value) ||
@@ -379,6 +503,69 @@ function formSubmissionError(
       const maxBytes = (field.maxFileSizeMB ?? 20) * 1024 * 1024;
       if (value.some((file) => (file as { size: number }).size > maxBytes)) {
         return `A file for ${field.label} exceeds the allowed size.`;
+      }
+      if (field.type !== "file" && value.some((file) => {
+        const contentType = (file as { contentType: string }).contentType.toLowerCase();
+        return field.type === "image" || field.type === "thumbnail" || field.type === "drawing" || field.type === "signature"
+          ? !contentType.startsWith("image/")
+          : false;
+      })) {
+        return `${field.label} must contain image files.`;
+      }
+    } else if (field.type === "video") {
+      try {
+        const url = new URL(String(value));
+        if (!["http:", "https:"].includes(url.protocol)) return `${field.label} must be a video URL.`;
+      } catch {
+        return `${field.label} must be a video URL.`;
+      }
+    } else if (field.type === "color") {
+      if (typeof value !== "string" || (!appSheetColors.has(value) && !/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(value))) {
+        return `${field.label} must be a valid color.`;
+      }
+    } else if (["latlong", "location", "xy"].includes(field.type)) {
+      const coordinatePair = Array.isArray(value)
+        ? value
+        : value && typeof value === "object"
+          ? field.type === "xy"
+            ? [(value as { x?: unknown }).x, (value as { y?: unknown }).y]
+            : [(value as { latitude?: unknown; lat?: unknown }).latitude ?? (value as { lat?: unknown }).lat, (value as { longitude?: unknown; lon?: unknown }).longitude ?? (value as { lon?: unknown }).lon]
+          : typeof value === "string"
+            ? value.split(",").map((coordinate) => coordinate.trim())
+            : [];
+      if (coordinatePair.length !== 2 || coordinatePair.some((coordinate) => !Number.isFinite(Number(coordinate)))) {
+        return `${field.label} must contain two valid coordinates.`;
+      }
+      if (field.type !== "xy") {
+        const [latitude, longitude] = coordinatePair.map(Number);
+        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+          return `${field.label} has coordinates outside the valid latitude/longitude range.`;
+        }
+      } else if (coordinatePair.some((coordinate) => Number(coordinate) < 0 || Number(coordinate) > 100)) {
+        return `${field.label} must use X and Y values from 0 to 100.`;
+      }
+    }
+
+    if (field.validIf?.trim()) {
+      let validationValue: unknown;
+      try {
+        validationValue = evaluateExpression(field.validIf, {
+          fields,
+          values: { ...formData, _THIS: value },
+          user: { email: member.email, name: member.name, role: member.roleName },
+        });
+      } catch {
+        return `The validation rule for ${field.label} could not be evaluated.`;
+      }
+      if (typeof validationValue === "boolean") {
+        if (!validationValue) return field.invalidMessage?.trim() || `${field.label} is not valid.`;
+      } else if (Array.isArray(validationValue)) {
+        const chosen = Array.isArray(value) ? value : [value];
+        if (chosen.some((item) => !validationValue.some((allowed) => String(allowed) === String(item)))) {
+          return field.invalidMessage?.trim() || `Choose a valid value for ${field.label}.`;
+        }
+      } else {
+        return `The validation rule for ${field.label} must return true/false or a list of allowed values.`;
       }
     }
   }
@@ -1142,24 +1329,44 @@ router.post("/requests", async (req, res): Promise<void> => {
   }
   const submissionData: Record<string, unknown> = { ...parsed.data.formData };
   for (const field of workflow.fields) {
-    if (field.readOnly) {
+    if (field.appFormula?.trim() || (field.readOnly && field.initialValueExpression?.trim())) {
+      delete submissionData[field.id];
+    } else if (field.readOnly) {
       submissionData[field.id] =
         field.type === "checkbox"
           ? field.defaultValue === "true"
           : field.defaultValue ?? "";
     }
   }
-  for (const field of workflow.fields) {
-    if (!isFieldVisible(field, submissionData)) delete submissionData[field.id];
+  let calculatedData: Record<string, unknown>;
+  try {
+    calculatedData = computeFormExpressions(
+      workflow.fields,
+      submissionData,
+      { email: member.email, name: member.name, role: member.roleName },
+    );
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error
+        ? `A workflow expression could not be calculated: ${error.message}`
+        : "A workflow expression could not be calculated.",
+    });
+    return;
   }
-  const formError = formSubmissionError(workflow.fields, submissionData);
+  Object.assign(submissionData, calculatedData);
+  for (const field of workflow.fields) {
+    if (field.type === "show" || !isFieldVisible(field, workflow.fields, submissionData, member)) {
+      delete submissionData[field.id];
+    }
+  }
+  const formError = formSubmissionError(workflow.fields, submissionData, member);
   if (formError) {
     res.status(400).json({ error: formError });
     return;
   }
   const selectedPeople = new Set<string>();
   for (const field of workflow.fields) {
-    if (field.type !== "people" || !isFieldVisible(field, submissionData)) continue;
+    if (field.type !== "people" || !isFieldVisible(field, workflow.fields, submissionData, member)) continue;
     const value = submissionData[field.id];
     for (const id of Array.isArray(value) ? value : value ? [value] : []) {
       if (typeof id === "string") selectedPeople.add(id);
@@ -1182,7 +1389,7 @@ router.post("/requests", async (req, res): Promise<void> => {
     }
   }
   for (const field of workflow.fields) {
-    if (field.type !== "file" || !isFieldVisible(field, submissionData)) continue;
+    if (!uploadFieldTypes.has(field.type) || !isFieldVisible(field, workflow.fields, submissionData, member)) continue;
     const files = submissionData[field.id] as Array<{
       fileId: string;
       name: string;
@@ -1198,11 +1405,17 @@ router.post("/requests", async (req, res): Promise<void> => {
       const [metadata] = await storedFile.getMetadata();
       const actualSize = Number(metadata.size);
       const actualType = String(metadata.contentType ?? uploaded.contentType);
+      const requiresImage = ["image", "thumbnail", "drawing", "signature"].includes(field.type);
       if (
         !Number.isFinite(actualSize) ||
-        actualSize > (field.maxFileSizeMB ?? 20) * 1024 * 1024
+        actualSize > (field.maxFileSizeMB ?? 20) * 1024 * 1024 ||
+        (requiresImage && !actualType.toLowerCase().startsWith("image/"))
       ) {
-        res.status(400).json({ error: `A file for ${field.label} exceeds the allowed size.` });
+        res.status(400).json({
+          error: requiresImage && !actualType.toLowerCase().startsWith("image/")
+            ? `${field.label} must contain image files.`
+            : `A file for ${field.label} exceeds the allowed size.`,
+        });
         return;
       }
       const acceptedTypes = (field.accept ?? "")

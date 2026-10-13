@@ -24,6 +24,18 @@ export interface WorkflowField {
   hidden?: boolean;
   /** @nullable */
   defaultValue?: string | null;
+  /** @nullable */
+  initialValueExpression?: string | null;
+  /** @nullable */
+  appFormula?: string | null;
+  /** @nullable */
+  showIf?: string | null;
+  /** @nullable */
+  requiredIf?: string | null;
+  /** @nullable */
+  validIf?: string | null;
+  /** @nullable */
+  invalidMessage?: string | null;
   /**
      * @minimum 1
      * @maximum 6
