@@ -247,6 +247,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Workflow"
+    delete:
+      operationId: deleteWorkflow
+      tags: [workflows]
+      summary: Remove a workflow from the catalog (admins only); existing requests remain accessible
+      responses:
+        "204":
+          description: Workflow removed from the catalog
+        "403":
+          description: Workspace admin permission required
+        "404":
+          description: Workflow not found in this workspace
   /requests:
     get:
       operationId: listRequests

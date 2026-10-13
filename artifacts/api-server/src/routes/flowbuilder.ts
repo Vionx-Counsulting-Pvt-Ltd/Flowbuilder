@@ -12,6 +12,7 @@ import {
   CreateUserResponse,
   CreateWorkflowBody,
   CreateWorkflowResponse,
+  DeleteWorkflowParams,
   GetCurrentUserResponse,
   GetDashboardResponse,
   GetReportOverviewResponse,
@@ -51,6 +52,7 @@ import {
   gte,
   inArray,
   lt,
+  ne,
   or,
 } from "drizzle-orm";
 import {
@@ -1041,7 +1043,7 @@ router.get("/dashboard", async (_req, res): Promise<void> => {
     db
       .select()
       .from(workflowsTable)
-      .where(eq(workflowsTable.tenantId, member.tenantId))
+      .where(and(eq(workflowsTable.tenantId, member.tenantId), ne(workflowsTable.status, "deleted")))
       .orderBy(desc(workflowsTable.updatedAt))
       .limit(8),
     db
@@ -1112,7 +1114,7 @@ router.get("/workflows", async (_req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(workflowsTable)
-    .where(eq(workflowsTable.tenantId, member.tenantId))
+    .where(and(eq(workflowsTable.tenantId, member.tenantId), ne(workflowsTable.status, "deleted")))
     .orderBy(desc(workflowsTable.updatedAt));
   const visible = isOrgAdmin(member)
     ? rows
@@ -1190,6 +1192,7 @@ router.get("/workflows/:workflowId", async (req, res): Promise<void> => {
       and(
         eq(workflowsTable.id, params.data.workflowId),
         eq(workflowsTable.tenantId, member.tenantId),
+        ne(workflowsTable.status, "deleted"),
       ),
     )
     .limit(1);
@@ -1223,6 +1226,7 @@ router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
       and(
         eq(workflowsTable.id, params.data.workflowId),
         eq(workflowsTable.tenantId, member.tenantId),
+        ne(workflowsTable.status, "deleted"),
       ),
     )
     .limit(1);
@@ -1258,8 +1262,12 @@ router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
       version: existing.version + 1,
       updatedAt: new Date(),
     })
-    .where(eq(workflowsTable.id, existing.id))
+    .where(and(eq(workflowsTable.id, existing.id), ne(workflowsTable.status, "deleted")))
     .returning();
+  if (!workflow) {
+    res.status(404).json({ error: "Workflow not found." });
+    return;
+  }
   await recordAudit({
     tenantId: member.tenantId,
     actorUserId: member.id,
@@ -1268,6 +1276,42 @@ router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
     action: `Workflow updated · v${workflow.version}`,
   });
   res.json(UpdateWorkflowResponse.parse(await workflowResponse(workflow)));
+});
+
+router.delete("/workflows/:workflowId", async (req, res): Promise<void> => {
+  const member = currentMember(res);
+  if (!isOrgAdmin(member)) {
+    res.status(403).json({ error: "Only workspace admins can delete workflows." });
+    return;
+  }
+  const params = DeleteWorkflowParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [deleted] = await db
+    .update(workflowsTable)
+    .set({ status: "deleted", updatedAt: new Date() })
+    .where(
+      and(
+        eq(workflowsTable.id, params.data.workflowId),
+        eq(workflowsTable.tenantId, member.tenantId),
+        ne(workflowsTable.status, "deleted"),
+      ),
+    )
+    .returning({ id: workflowsTable.id });
+  if (!deleted) {
+    res.status(404).json({ error: "Workflow not found." });
+    return;
+  }
+  await recordAudit({
+    tenantId: member.tenantId,
+    actorUserId: member.id,
+    entityType: "workflow",
+    entityId: deleted.id,
+    action: "Workflow deleted",
+  });
+  res.status(204).end();
 });
 
 router.get("/requests", async (req, res): Promise<void> => {

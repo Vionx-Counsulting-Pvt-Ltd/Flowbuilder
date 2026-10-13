@@ -931,6 +931,16 @@ export const UpdateWorkflowResponse = zod.object({
 
 
 /**
+ * @summary Remove a workflow from the catalog (admins only); existing requests remain accessible
+ */
+export const DeleteWorkflowParams = zod.object({
+  "workflowId": zod.coerce.string()
+})
+
+export const DeleteWorkflowResponse = zod.void()
+
+
+/**
  * @summary List requests visible to the current member
  */
 export const ListRequestsQueryParams = zod.object({

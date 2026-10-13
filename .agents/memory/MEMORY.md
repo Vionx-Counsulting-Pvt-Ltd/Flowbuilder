@@ -4,3 +4,6 @@
 - [Reference data requirements](reference-data-requirements.md) — maintained tables must supply form choices, including onboarding branches.
 - [Spreadsheet imports](spreadsheet-import-compatibility.md) — distinguish workbook results from worksheet grids; verify the installed reader API.
 - [Workspace layout policy](editor-layout-policy.md) — compact, full-width pages; editor-only pane scrolling and unchanged application behavior.
+- [Workflow deletion policy](workflow-deletion-policy.md) — Admin deletion removes availability, while request history and existing approvals remain intact.
+- [Drizzle index predicates](drizzle-index-predicates.md) — schema push can miss predicate changes on existing named indexes; verify the live definition.
+- [VionX product identity](vionx-product-identity.md) — FlowBuilder is a VionX project; use its official company context for product marketing.

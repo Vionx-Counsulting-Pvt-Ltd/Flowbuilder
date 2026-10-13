@@ -512,8 +512,8 @@
 .workflow-card-foot { display: flex; justify-content: space-between; gap: 6px; margin-top: 17px; border-top: 1px solid #efede5; padding-top: 11px; }
 .workflow-card-foot span { display: inline-flex; align-items: center; gap: 5px; color: #838e89; font-size: 8px; white-space: nowrap; }
 .workflow-card-foot svg { color: #8fa092; }
-.workflow-actions { display: flex; gap: 6px; margin-top: 14px; border-top: 1px solid #efede5; padding-top: 12px; }
-.workflow-actions button { padding: 8px 9px; font-size: 9px; }
+.workflow-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; border-top: 1px solid #efede5; padding-top: 12px; }
+.workflow-actions button { padding: 8px 9px; font-size: 11px; }
 .builder-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .builder-section-head h3 { color: #39474b; font-family: var(--app-font-serif); font-size: 13px; font-weight: 800; }
 .builder-section-head p { margin-top: 3px; color: #89928f; font-size: 10px; }

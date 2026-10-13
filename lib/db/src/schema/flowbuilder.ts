@@ -195,7 +195,7 @@ export const workflowsTable = pgTable(
     uniqueIndex("flow_workflows_tenant_name_idx").on(
       table.tenantId,
       table.name,
-    ),
+    ).where(sql`${table.status} <> 'deleted'`),
   ],
 );
 

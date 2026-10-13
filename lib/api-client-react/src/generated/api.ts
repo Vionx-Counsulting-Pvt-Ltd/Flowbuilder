@@ -1304,6 +1304,80 @@ export const useUpdateWorkflow = <TError = ErrorType<unknown>,
       return useMutation(getUpdateWorkflowMutationOptions(options));
     }
 
+export const getDeleteWorkflowUrl = (workflowId: string,) => {
+
+
+
+
+  return `/api/workflows/${workflowId}`
+}
+
+/**
+ * @summary Remove a workflow from the catalog (admins only); existing requests remain accessible
+ */
+export const deleteWorkflow = async (workflowId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteWorkflowUrl(workflowId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteWorkflowMutationKey = () => ['deleteWorkflow'] as const;
+
+export const getDeleteWorkflowMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkflow>>, TError,DeleteWorkflowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWorkflow>>, TError,DeleteWorkflowMutationVariables, TContext> => {
+
+const mutationKey = getDeleteWorkflowMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWorkflow>>, DeleteWorkflowMutationVariables> = (props) => {
+          const {workflowId} = props ?? {};
+
+          return  deleteWorkflow(workflowId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteWorkflowMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWorkflow>>>
+
+    export type DeleteWorkflowMutationError = ErrorType<void>
+    export type DeleteWorkflowMutationVariables = {workflowId: string}
+
+    /**
+ * @summary Remove a workflow from the catalog (admins only); existing requests remain accessible
+ */
+export const useDeleteWorkflow = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkflow>>, TError,DeleteWorkflowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteWorkflow>>,
+        TError,
+        DeleteWorkflowMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteWorkflowMutationOptions(options));
+    }
+
 export const getListRequestsUrl = (params?: ListRequestsParams,) => {
   const normalizedParams = new URLSearchParams();
 

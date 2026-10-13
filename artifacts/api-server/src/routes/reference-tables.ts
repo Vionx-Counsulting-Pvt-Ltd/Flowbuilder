@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 import { db, referenceRowsTable, referenceTablesTable, workflowsTable, type ReferenceTableRecord } from "@workspace/db";
 import { AddReferenceRowsBody, CreateReferenceTableBody, UpdateReferenceRowBody, UpdateReferenceTableBody } from "@workspace/api-zod";
 import { currentMember, hasPermission, requireMember } from "../lib/flowbuilder-auth";
@@ -24,7 +24,7 @@ async function detail(table: ReferenceTableRecord, client: typeof db | Tx = db) 
   return { id: table.id, name: table.name, description: table.description, columns: table.columns, rowCount: rows.length, activeRowCount: rows.filter(row => row.active).length, createdAt: table.createdAt.toISOString(), updatedAt: table.updatedAt.toISOString(), rows: rows.map(({ id, values, active }) => ({ id, values, active })) };
 }
 async function linkedWorkflows(tenantId: string, tableId: string, client: typeof db | Tx) {
-  const workflows = await client.select({ name: workflowsTable.name, fields: workflowsTable.fields }).from(workflowsTable).where(eq(workflowsTable.tenantId, tenantId));
+  const workflows = await client.select({ name: workflowsTable.name, fields: workflowsTable.fields }).from(workflowsTable).where(and(eq(workflowsTable.tenantId, tenantId), ne(workflowsTable.status, "deleted")));
   return workflows.filter(workflow => workflow.fields.some(field => field.sourceTableId === tableId));
 }
 async function touch(table: ReferenceTableRecord, tx: Tx) {

@@ -5,16 +5,16 @@ import { shadcn } from '@clerk/themes';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import {
-  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, Building2, Check, CheckCircle2, ChevronDown, ChevronLeft,
+  Activity, ArrowRight, ArrowUpRight, Bell, Building2, Check, CheckCircle2, ChevronDown, ChevronLeft,
   ChevronRight, CircleHelp, Clock3, FileCheck2, Filter, GitBranch, LayoutDashboard,
-  Copy, Download, ListChecks, Menu, MoreHorizontal, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles,
-  Users, Workflow as WorkflowIcon, X, XCircle, Zap,
+  Copy, Download, Trash2, ListChecks, Menu, MoreHorizontal, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles,
+  Users, Workflow as WorkflowIcon, X, XCircle,
 } from 'lucide-react';
 import {
   getGetCurrentUserQueryKey, getGetDashboardQueryKey, getGetReportOverviewQueryKey, getGetRequestQueryKey,
   getGetWorkflowQueryKey, getListNotificationsQueryKey, getListRequestsQueryKey, getListRolesQueryKey,
   getListUsersQueryKey, getListWorkflowsQueryKey, useActOnRequest, useCreateRequest, useCreateRole,
-  useCreateUser, useCreateWorkflow, useGetCurrentUser, useGetDashboard, useGetReportOverview,
+  useCreateUser, useCreateWorkflow, useDeleteWorkflow, useGetCurrentUser, useGetDashboard, useGetReportOverview,
   useGetRequest, useGetWorkflow, useListNotifications, useListPeople, useListRequests, useListRoles, useListUsers,
   useListWorkflows, useMarkNotificationRead, useUpdateRole, useUpdateUser, useUpdateWorkflow,
 } from '@workspace/api-client-react';
@@ -23,6 +23,7 @@ import type {
   WorkspaceRole, WorkspaceUser,
 } from '@workspace/api-client-react';
 import WorkflowEditor from './WorkflowEditor';
+import VionxLanding from './pages/VionxLanding';
 import RequestFormModal from './components/RequestFormModal';
 import TablesPage from './pages/TablesPage';
 import BulkUserImport from './BulkUserImport';
@@ -144,6 +145,7 @@ function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) { return <s
 const nav = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/workflows', label: 'Workflows', icon: WorkflowIcon },
+  { href: '/workflow-templates', label: 'Templates', icon: Copy },
   { href: '/requests', label: 'Requests', icon: ListChecks },
   { href: '/tables', label: 'Tables', icon: ListChecks },
   { href: '/team', label: 'Team', icon: Users },
@@ -151,22 +153,7 @@ const nav = [
   { href: '/platform', label: 'Platform tenants', icon: Building2 },
 ];
 function HomeRedirect() {
-  return <><Show when="signed-in"><Redirect to="/dashboard" /></Show><Show when="signed-out"><Landing /></Show></>;
-}
-function Landing() {
-  return <main className="landing">
-    <nav className="landing-nav"><Link href="/" className="brand"><img src={`${basePath}/logo.svg`} alt="" /><span>flowbuilder</span></Link><div className="hidden items-center gap-8 md:flex"><a href="#how-it-works">How it works</a><a href="#teams">For teams</a><a href="#principles">Why FlowBuilder</a></div><div className="flex items-center gap-2"><Link href="/sign-in" className="landing-signin">Sign in</Link><Link href="/sign-up" className="button button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold">Start building <ArrowRight size={15} /></Link></div></nav>
-    <section className="landing-hero">
-      <div className="hero-copy enter"><div className="hero-kicker"><span className="kicker-dot" /> THE WORK BEHIND THE WORK</div><h1 className="display">Good work moves<br /><em>with intention.</em></h1><p>FlowBuilder gives every request a clear path, every decision an owner, and every team a little more room to do their best work.</p><div className="mt-8 flex flex-wrap gap-3"><Link href="/sign-up" className="button button-primary inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold">Build your first workflow <ArrowRight size={16} /></Link><a className="button button-outline inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold" href="#how-it-works">See how it works <ChevronRight size={16} /></a></div><div className="hero-proof"><div className="proof-avatars"><span>MK</span><span>JL</span><span>RA</span><span>+</span></div><span>Made for the teams keeping things moving</span></div></div>
-      <div className="hero-art enter enter-delay-2"><div className="art-grid" /><div className="route-card"><div className="route-top"><span className="route-label">REQUEST FLOW</span><span className="live-dot">Live</span></div><div className="route-title">New vendor review</div><div className="route-sub">FINANCE · 3 STEPS</div><div className="route-line"><span className="route-node done"><Check size={13} /></span><div><b>Request submitted</b><small>by Morgan Kim · 9:42 AM</small></div><CheckCircle2 className="route-check" size={17} /></div><div className="route-line"><span className="route-node active-node"><span /></span><div><b>Finance review</b><small>with Alex Rivera · In progress</small></div><span className="working">NOW</span></div><div className="route-line"><span className="route-node" /><div><b>Operations approval</b><small>Up next · SLA 24h</small></div></div><div className="route-bottom"><span>Average completion</span><strong>1.4 days <ArrowDownRight size={14} /></strong></div></div><div className="floating-note"><span className="note-icon"><Zap size={14} /></span><div><b>Nothing falls through</b><small>One clear owner at every step</small></div></div><div className="art-index">01 <span>/ 04</span></div></div>
-      <div className="hero-foot"><span>THE OPERATIONS WORKSPACE</span><span>Built for clarity, not more noise <ArrowDownRight size={14} /></span></div>
-    </section>
-    <section className="landing-trust"><span>WORK THAT CROSSES TEAM BOUNDARIES</span><div><b>Finance</b><b>People</b><b>Operations</b><b>Legal</b><b>IT & Security</b></div></section>
-    <section className="landing-section" id="how-it-works"><div className="section-label">A BETTER KIND OF HANDOFF</div><div className="section-split"><h2 className="display">From “who owns this?”<br />to <em>already in motion.</em></h2><p>Build a path once. Let the right people know when it’s their turn. Keep the whole story in one place, from first ask to final sign-off.</p></div><div className="feature-rail"><article><span className="feature-number">01</span><GitBranch /><h3>Design the path</h3><p>Shape each workflow around how your team actually works. Add the right questions, owners, and guardrails.</p></article><article><span className="feature-number">02</span><Users /><h3>Give work an owner</h3><p>Requests find the right person automatically—by role, manager, or a simple condition you define.</p></article><article><span className="feature-number">03</span><FileCheck2 /><h3>Keep the whole story</h3><p>See what changed, who decided, and what’s next without chasing context across five tools.</p></article></div></section>
-    <section className="landing-band" id="teams"><div className="band-quote">“</div><div><div className="section-label">CLARITY IS A TEAM SPORT</div><h2 className="display">Make the process<br />feel like progress.</h2><p>One calm place for thoughtful work to get done. Less chasing. Fewer “just checking in” messages. Better decisions, with the context to back them up.</p><Link href="/sign-up" className="band-link">Give your team a clearer path <ArrowRight size={16} /></Link></div><div className="band-metrics"><div><b>01</b><span>home for every request</span></div><div><b>Every</b><span>handoff has an owner</span></div><div><b>Always</b><span>the full decision trail</span></div></div></section>
-    <section className="landing-last" id="principles"><div className="section-label">YOUR TEAM HAS BETTER THINGS TO DO</div><h2 className="display">Make work flow.<br /><em>Get back to the work.</em></h2><Link href="/sign-up" className="button button-primary inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold">Create your workspace <ArrowRight size={16} /></Link></section>
-    <footer className="landing-footer"><Link href="/" className="brand"><img src={`${basePath}/logo.svg`} alt="" /><span>flowbuilder</span></Link><span>Thoughtful work, moving forward.</span><Link href="/sign-in">Sign in to your workspace <ArrowRight size={14} /></Link></footer>
-  </main>;
+  return <><Show when="signed-in"><Redirect to="/dashboard" /></Show><Show when="signed-out"><VionxLanding /></Show></>;
 }
 function SignInPage() { return <div className="auth-wrap"><div className="auth-context"><Link href="/" className="brand"><img src={`${basePath}/logo.svg`} alt="" /><span>flowbuilder</span></Link><p>Every decision has a next step.</p></div><div className="auth-clerk"><ClerkSignIn /></div></div>; }
 function ClerkSignIn() { return <ClerkSignInView routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />; }
@@ -180,6 +167,7 @@ function AppFrame() {
   const notificationCount = unread.data?.filter(item => !item.read).length || 0;
   const visibleNav = nav.filter(item => {
     if (item.href === '/tables') return Boolean(current.data?.permissions.includes('build') || current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner');
+    if (item.href === '/workflow-templates') return Boolean(current.data?.permissions.includes('build') || current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner');
     if (item.href === '/team') return current.data?.permissions.includes('admin') ?? false;
     if (item.href === '/reports') return Boolean(current.data?.permissions.includes('report') || current.data?.permissions.includes('admin'));
     if (item.href === '/platform') return current.data?.isPlatformAdmin ?? false;
@@ -210,6 +198,7 @@ function AppFrame() {
         <Route path="/workflows/new" component={WorkflowEditor} />
         <Route path="/tables" component={TablesPage} />
         <Route path="/workflows/:workflowId/edit" component={WorkflowEditor} />
+        <Route path="/workflow-templates" component={WorkflowTemplatesPage} />
         <Route path="/workflows" component={WorkflowsPage} />
         <Route path="/requests" component={RequestsPage} />
         <Route path="/requests/:requestId" component={RequestDetailPage} />
@@ -340,13 +329,52 @@ function WorkflowModal({ workflow, onClose }: { workflow?: Workflow; onClose: ()
   </form></Modal>;
 }
 function WorkflowsPage() {
-  const qc = useQueryClient(); const query = useListWorkflows(); const update = useUpdateWorkflow(); const create = useCreateWorkflow(); const current = useGetCurrentUser(); const roles = useListRoles();
+  const qc = useQueryClient(); const query = useListWorkflows(); const update = useUpdateWorkflow(); const create = useCreateWorkflow(); const current = useGetCurrentUser();
   const [, setLocation] = useLocation();
   const canBuild = Boolean(current.data?.permissions.includes('build') || current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner');
-  const [search, setSearch] = useState(''); const [tab, setTab] = useState('All'); const [templateRole, setTemplateRole] = useState(''); const [createMessage, setCreateMessage] = useState('');
+  const [search, setSearch] = useState(''); const [tab, setTab] = useState('All'); const [createMessage, setCreateMessage] = useState('');
+  const isAdmin = Boolean(current.data?.permissions.includes('admin'));
+  const remove = useDeleteWorkflow(); const [deleting, setDeleting] = useState<Workflow | null>(null); const [deleteError, setDeleteError] = useState('');
+  function confirmDelete() {
+    if (!deleting || remove.isPending) return;
+    const wf = deleting; setDeleteError('');
+    remove.mutate({ workflowId: wf.id }, {
+      onSuccess: () => { setDeleting(null); invalidate(qc, [getListWorkflowsQueryKey(), getGetDashboardQueryKey(), getGetWorkflowQueryKey(wf.id), getListRequestsQueryKey()]); setCreateMessage(`${wf.name} was deleted.`); },
+      onError: () => setDeleteError('The workflow could not be deleted. Please try again.'),
+    });
+  }
   const rows = query.data?.filter(w => (tab === 'All' || w.status === tab.toLowerCase()) && `${w.name} ${w.category} ${w.description}`.toLowerCase().includes(search.toLowerCase())) || [];
   function openEditor(workflowId?: string) { setLocation(workflowId ? `/workflows/${workflowId}/edit` : '/workflows/new'); }
   function changeStatus(wf: Workflow) { update.mutate({ workflowId: wf.id, data: { status: wf.status === 'active' ? 'inactive' : 'active' } }, { onSuccess: () => invalidate(qc, [getListWorkflowsQueryKey(), getGetWorkflowQueryKey(wf.id)]) }); }
+  function duplicateWorkflow(wf: Workflow) {
+    const fieldIds = new Map(wf.fields.map(field => [field.id, crypto.randomUUID()]));
+    const fields = wf.fields.map(field => ({ ...field, id: fieldIds.get(field.id)! }));
+    const stages = wf.stages.map((stage, index) => ({
+      ...stage, id: crypto.randomUUID(), order: index + 1,
+      conditionFieldId: stage.conditionFieldId ? fieldIds.get(stage.conditionFieldId) || null : null,
+    }));
+    create.mutate({ data: { name: `Copy of ${wf.name}`, category: wf.category, description: wf.description, routing: wf.routing, fields, stages } }, {
+      onSuccess: () => { invalidate(qc, [getListWorkflowsQueryKey(), getGetDashboardQueryKey()]); setCreateMessage(`Copy of ${wf.name} saved as a draft.`); },
+      onError: () => setCreateMessage(`Could not duplicate ${wf.name}. Please try again.`),
+    });
+  }
+  return <><PageHeading eyebrow="THE SYSTEMS YOUR TEAM RUNS ON" title="Workflows" description="Build a reliable path for recurring work. Make the next handoff obvious." action={canBuild && <><Link href="/workflow-templates" className="button button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold" data-testid="link-workflow-templates"><Copy size={16} /> Templates</Link><Button onClick={() => openEditor()} data-testid="button-new-workflow"><Plus size={16} /> New workflow</Button></>} />
+    {createMessage && <p className="mb-3 text-xs text-primary" role="status">{createMessage}</p>}
+    <div className="workflow-toolbar"><div className="tabs">{['All', 'Active', 'Draft', 'Inactive'].map(t => <button key={t} className={tab === t ? 'selected' : ''} onClick={() => setTab(t)}>{t}<span>{t === 'All' ? query.data?.length || 0 : query.data?.filter(w => w.status === t.toLowerCase()).length || 0}</span></button>)}</div><label className="searchbox"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search workflows" aria-label="Search workflows" /></label></div>
+      <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}>{rows.length ? <div className="workflow-grid">{rows.map((wf, index) => <article className={`workflow-card surface enter enter-delay-${Math.min(index % 3 + 1, 3)}`} key={wf.id}><div className="workflow-card-head"><span className="workflow-glyph"><GitBranch size={18} /></span><StatusPill status={wf.status} />{canBuild && <button className="card-menu" aria-label={`Edit ${wf.name}`} onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-menu-${wf.id}`}><MoreHorizontal size={18} /></button>}</div><div className="workflow-category">{wf.category} <span>·</span> v{wf.version}</div><h2>{wf.name}</h2><p>{wf.description || 'A clear path for this kind of request.'}</p><div className="workflow-route">{wf.stages.slice(0, 3).map((stage, i) => <span key={stage.id}><i className={i === 0 ? 'route-start' : ''} />{stage.name}</span>)}{wf.stages.length > 3 && <small>+{wf.stages.length - 3}</small>}</div><div className="workflow-card-foot"><span><Users size={14} /> {wf.ownerName}</span><span><FileCheck2 size={14} /> {wf.requestCount} requests</span></div>{canBuild && <div className="workflow-actions"><Button variant="outline" className="flex-1" onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-${wf.id}`}><Settings2 size={15} /> Edit workflow</Button><Button variant="outline" title="Create a new draft from this workflow" onClick={() => duplicateWorkflow(wf)} disabled={create.isPending}><Copy size={15} /> Copy</Button><Button variant={wf.status === 'active' ? 'quiet' : 'outline'} className="min-w-24" disabled={update.isPending} onClick={() => changeStatus(wf)}>{wf.status === 'active' ? 'Pause' : 'Publish'}</Button>{isAdmin && <Button variant="danger" onClick={() => { setDeleteError(''); setDeleting(wf); }} data-testid={`button-delete-workflow-${wf.id}`}><Trash2 size={15} /> Delete</Button>}</div>}</article>)}</div> : <EmptyState title={search ? 'No workflows found' : 'Start with one clear path'} body={search ? 'Try a different name or category.' : 'Create the first workflow your team can rely on. Add request fields, owners, and approval stages as you go.'} action={!search && canBuild && <Button onClick={() => openEditor()} data-testid="button-create-first-workflow"><Plus size={15} /> Create a workflow</Button>} />}</LoadState>
+    {deleting && <Modal title="Delete this workflow?" subtitle={deleting.name} onClose={() => { if (!remove.isPending) setDeleting(null); }}>
+      <p className="text-sm leading-6">You are about to delete <b>{deleting.name}</b>, which has {deleting.requestCount} {deleting.requestCount === 1 ? 'request' : 'requests'}. It will be removed from the workflow catalog and no new requests can be submitted. Existing requests and approvals remain, including their history.</p>
+      {deleteError && <p className="form-error mt-3" role="alert" data-testid="status-delete-workflow-error">{deleteError}</p>}
+      <div className="mt-5 flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={remove.isPending} onClick={() => setDeleting(null)}>Cancel</Button><Button variant="danger" disabled={remove.isPending} onClick={confirmDelete} data-testid="button-confirm-delete-workflow">{remove.isPending ? 'Deleting…' : 'Delete workflow'}</Button></div>
+    </Modal>}
+  </>;
+}
+
+function WorkflowTemplatesPage() {
+  const qc = useQueryClient(); const create = useCreateWorkflow(); const current = useGetCurrentUser(); const roles = useListRoles();
+  const [, setLocation] = useLocation();
+  const canBuild = Boolean(current.data?.permissions.includes('build') || current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner');
+  const [templateRole, setTemplateRole] = useState(''); const [createMessage, setCreateMessage] = useState('');
   const role = roles.data?.find(item => item.id === templateRole) || roles.data?.find(item => item.name.toLowerCase() === 'approver') || roles.data?.find(item => item.memberCount > 0) || roles.data?.[0];
   const templateSpecs = [
     { name: 'Expense reimbursement', category: 'Finance', description: 'Capture an employee expense and route it for review before reimbursement.', routing: 'sequential' as const, fields: [['Expense description', 'text'], ['Amount', 'number'], ['Expense date', 'date'], ['Business purpose', 'textarea']] as const, stage: 'Finance review' },
@@ -365,26 +393,14 @@ function WorkflowsPage() {
       onError: () => setCreateMessage(`Could not create ${spec.name}. Please try again.`),
     });
   }
-  function duplicateWorkflow(wf: Workflow) {
-    const fieldIds = new Map(wf.fields.map(field => [field.id, crypto.randomUUID()]));
-    const fields = wf.fields.map(field => ({ ...field, id: fieldIds.get(field.id)! }));
-    const stages = wf.stages.map((stage, index) => ({
-      ...stage, id: crypto.randomUUID(), order: index + 1,
-      conditionFieldId: stage.conditionFieldId ? fieldIds.get(stage.conditionFieldId) || null : null,
-    }));
-    create.mutate({ data: { name: `Copy of ${wf.name}`, category: wf.category, description: wf.description, routing: wf.routing, fields, stages } }, {
-      onSuccess: () => { invalidate(qc, [getListWorkflowsQueryKey(), getGetDashboardQueryKey()]); setCreateMessage(`Copy of ${wf.name} saved as a draft.`); },
-      onError: () => setCreateMessage(`Could not duplicate ${wf.name}. Please try again.`),
-    });
-  }
-  return <><PageHeading eyebrow="THE SYSTEMS YOUR TEAM RUNS ON" title="Workflows" description="Build a reliable path for recurring work. Make the next handoff obvious." action={canBuild && <Button onClick={() => openEditor()} data-testid="button-new-workflow"><Plus size={16} /> New workflow</Button>} />
-     {canBuild && <section className="surface mb-5 p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><span className="section-label">GET A HEAD START</span><h2 className="display mt-1 text-xl font-bold">Workflow templates</h2><p className="mt-1 text-sm text-muted-foreground">Start with a useful draft, then tailor fields and routing to your team.</p></div><label className="form-field min-w-48"><span>Default approver role</span><SelectInput value={role?.id || ''} onChange={e => setTemplateRole(e.target.value)}><option value="">Choose a role</option>{roles.data?.map(item => <option key={item.id} value={item.id}>{item.name}{item.memberCount ? ` · ${item.memberCount}` : ''}</option>)}</SelectInput></label></div>
+  if (current.isLoading) return <Skeleton rows={2} />;
+  if (!canBuild) return <PageHeading eyebrow="BUILDER ACCESS" title="Builder access required" description="Ask a workspace administrator to grant build access to use workflow templates." action={<Link href="/workflows" className="button button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold">Back to workflows</Link>} />;
+  return <><PageHeading eyebrow="GET A HEAD START" title="Workflow templates" description="Start with a useful draft, then tailor fields and routing to your team." action={<Link href="/workflows" className="button button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><ChevronLeft size={15} /> Workflows</Link>} />
+    <section className="surface p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><span className="section-label">READY-MADE STARTERS</span><h2 className="display mt-1 text-xl font-bold">Choose a starting point</h2></div><label className="form-field min-w-48"><span>Default approver role</span><SelectInput aria-label="Default approver role" value={role?.id || ''} onChange={e => setTemplateRole(e.target.value)}><option value="">Choose a role</option>{roles.data?.map(item => <option key={item.id} value={item.id}>{item.name}{item.memberCount ? ` · ${item.memberCount}` : ''}</option>)}</SelectInput></label></div>
        {createMessage && <p className="mt-3 text-xs text-primary" role="status">{createMessage}</p>}
        <div className="mt-4 grid gap-3 md:grid-cols-3">{templateSpecs.map(spec => <article key={spec.name} className="rounded-xl border border-border bg-background p-4 transition hover:-translate-y-0.5 hover:shadow-sm"><div className="flex items-center justify-between"><span className="workflow-glyph"><GitBranch size={17} /></span><span className="status-pill status-draft">DRAFT</span></div><h3 className="mt-3 font-semibold">{spec.name}</h3><p className="mt-1 min-h-10 text-xs leading-5 text-muted-foreground">{spec.description}</p><div className="mt-3 flex items-center justify-between"><small className="text-muted-foreground">{spec.category} · {spec.fields.length} fields</small><Button variant="outline" disabled={!role || create.isPending} onClick={() => createFromTemplate(spec)}>{create.isPending ? 'Adding…' : 'Use template'} <ArrowRight size={13} /></Button></div></article>)}</div>
        {!roles.isLoading && !roles.data?.length && <p className="mt-3 text-xs text-muted-foreground">Create a workspace role before using templates.</p>}
-     </section>}
-    <div className="workflow-toolbar"><div className="tabs">{['All', 'Active', 'Draft', 'Inactive'].map(t => <button key={t} className={tab === t ? 'selected' : ''} onClick={() => setTab(t)}>{t}<span>{t === 'All' ? query.data?.length || 0 : query.data?.filter(w => w.status === t.toLowerCase()).length || 0}</span></button>)}</div><label className="searchbox"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search workflows" aria-label="Search workflows" /></label></div>
-      <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}>{rows.length ? <div className="workflow-grid">{rows.map((wf, index) => <article className={`workflow-card surface enter enter-delay-${Math.min(index % 3 + 1, 3)}`} key={wf.id}><div className="workflow-card-head"><span className="workflow-glyph"><GitBranch size={18} /></span><StatusPill status={wf.status} />{canBuild && <button className="card-menu" aria-label={`Edit ${wf.name}`} onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-menu-${wf.id}`}><MoreHorizontal size={18} /></button>}</div><div className="workflow-category">{wf.category} <span>·</span> v{wf.version}</div><h2>{wf.name}</h2><p>{wf.description || 'A clear path for this kind of request.'}</p><div className="workflow-route">{wf.stages.slice(0, 3).map((stage, i) => <span key={stage.id}><i className={i === 0 ? 'route-start' : ''} />{stage.name}</span>)}{wf.stages.length > 3 && <small>+{wf.stages.length - 3}</small>}</div><div className="workflow-card-foot"><span><Users size={14} /> {wf.ownerName}</span><span><FileCheck2 size={14} /> {wf.requestCount} requests</span></div>{canBuild && <div className="workflow-actions"><Button variant="outline" className="flex-1" onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-${wf.id}`}><Settings2 size={15} /> Edit workflow</Button><Button variant="outline" title="Create a new draft from this workflow" onClick={() => duplicateWorkflow(wf)} disabled={create.isPending}><Copy size={15} /> Copy</Button><Button variant={wf.status === 'active' ? 'quiet' : 'outline'} className="min-w-24" disabled={update.isPending} onClick={() => changeStatus(wf)}>{wf.status === 'active' ? 'Pause' : 'Publish'}</Button></div>}</article>)}</div> : <EmptyState title={search ? 'No workflows found' : 'Start with one clear path'} body={search ? 'Try a different name or category.' : 'Create the first workflow your team can rely on. Add request fields, owners, and approval stages as you go.'} action={!search && canBuild && <Button onClick={() => openEditor()} data-testid="button-create-first-workflow"><Plus size={15} /> Create a workflow</Button>} />}</LoadState>
+    </section>
   </>;
 }
 
