@@ -169,6 +169,15 @@ export default function WorkflowEditor() {
     setSelectedId(field.id);
     setSaved(false);
   }
+  function removeSelectedField() {
+    if (!selected) return;
+    const next = definition.fields.filter(field => field.id !== selected.id);
+    setDefinition(value => ({ ...value, fields: value.fields.filter(field => field.id !== selected.id) }));
+    setSelectedId(next[0]?.id || '');
+    setTestValues(value => Object.fromEntries(Object.entries(value).filter(([id]) => id !== selected.id)));
+    setPreviewErrors(value => Object.fromEntries(Object.entries(value).filter(([id]) => id !== selected.id)));
+    setSaved(false);
+  }
   function patchStage(id: string, patch: Partial<WorkflowStage>) {
     setDefinition(value => ({ ...value, stages: value.stages.map(stage => stage.id === id ? { ...stage, ...patch } : stage) }));
     setSaved(false);
@@ -304,7 +313,7 @@ export default function WorkflowEditor() {
           </section>
         </main>
         <aside className="fb-properties">
-          <div className="fb-properties-head"><div><span className="section-label">FIELD PROPERTIES</span><h2>{selected ? (fieldTypes.find(item => item.type === selected.type)?.label || 'Field') : 'No selection'}</h2></div>{selected && <button type="button" className="fb-prop-close" aria-label="Remove selected field" onClick={() => { if (definition.fields.length > 1) { const next = definition.fields.filter(item => item.id !== selected.id); setDefinition(value => ({ ...value, fields: next })); setSelectedId(next[0]?.id || ''); } }} data-testid={`button-remove-selected-${selected.id}`}><Trash2 size={15} /></button>}</div>
+          <div className="fb-properties-head"><div><span className="section-label">FIELD PROPERTIES</span><h2>{selected ? (fieldTypes.find(item => item.type === selected.type)?.label || 'Field') : 'No selection'}</h2></div>{selected && <button type="button" className="fb-prop-close" aria-label="Remove selected field" onClick={removeSelectedField} data-testid={`button-remove-selected-${selected.id}`}><Trash2 size={15} /></button>}</div>
           {selected ? <div className="fb-property-content">
             <div className="fb-prop-group"><span className="fb-prop-label">IDENTITY</span><Label title="Field key" hint="Stable identifier used in submitted data."><input className={inputClass} value={selected.key || ''} placeholder={selected.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'field_key'} onChange={e => patchField(selected.id, { key: e.target.value || undefined })} data-testid={`input-field-key-${selected.id}`} /></Label><Label title="Label"><input className={inputClass} value={selected.label} onChange={e => patchField(selected.id, { label: e.target.value })} placeholder="Question label" data-testid={`input-field-label-${selected.id}`} /></Label><Label title="Placeholder"><input className={inputClass} value={selected.placeholder || ''} onChange={e => patchField(selected.id, { placeholder: e.target.value || undefined })} placeholder="Help the requester answer…" data-testid={`input-field-placeholder-${selected.id}`} /></Label><Label title="Help text"><input className={inputClass} value={selected.helpText || ''} onChange={e => patchField(selected.id, { helpText: e.target.value || undefined })} placeholder="Additional guidance" data-testid={`input-field-help-${selected.id}`} /></Label></div>
             <div className="fb-prop-group"><span className="fb-prop-label">STATE</span><label className="fb-switch-row"><span>Required</span><input type="checkbox" checked={selected.required} onChange={e => patchField(selected.id, { required: e.target.checked })} data-testid={`toggle-field-required-${selected.id}`} /></label><label className="fb-switch-row"><span>Read-only</span><input type="checkbox" checked={Boolean(selected.readOnly)} onChange={e => patchField(selected.id, { readOnly: e.target.checked })} data-testid={`toggle-field-readonly-${selected.id}`} /></label><label className="fb-switch-row"><span>Hidden</span><input type="checkbox" checked={Boolean(selected.hidden)} onChange={e => patchField(selected.id, { hidden: e.target.checked })} data-testid={`toggle-field-hidden-${selected.id}`} /></label><Label title="Initial value"><input className={inputClass} value={selected.defaultValue || ''} onChange={e => patchField(selected.id, { defaultValue: e.target.value || undefined })} placeholder="Optional default" data-testid={`input-field-default-${selected.id}`} /></Label></div>
