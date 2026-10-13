@@ -29,6 +29,7 @@ import RequestAttachments from './components/RequestAttachments';
 import TablesPage from './pages/TablesPage';
 import BulkUserImport from './BulkUserImport';
 import PlatformAdminPage from './PlatformAdminPage';
+import { requestGuardedAction, useGuardedLocation } from './lib/guarded-location';
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -214,7 +215,7 @@ function AppFrame() {
 }
 function AccountSignOutListener() {
   const { signOut } = useClerk();
-  useEffect(() => { const listener = () => { void signOut({ redirectUrl: basePath || '/' }); }; window.addEventListener('flowbuilder:signout', listener); return () => window.removeEventListener('flowbuilder:signout', listener); }, [signOut]);
+  useEffect(() => { const listener = () => requestGuardedAction(() => { void signOut({ redirectUrl: basePath || '/' }); }); window.addEventListener('flowbuilder:signout', listener); return () => window.removeEventListener('flowbuilder:signout', listener); }, [signOut]);
   return null;
 }
 function ClerkQueryClientCacheInvalidator() {
@@ -253,7 +254,7 @@ function Router() {
 }
 function App() {
   if (!clerkPubKey) throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
-  return <WouterRouter base={basePath}><Router /></WouterRouter>;
+  return <WouterRouter base={basePath} hook={useGuardedLocation}><Router /></WouterRouter>;
 }
 
 const filters = ['All', 'Overdue', 'Due today', 'Due in 3 days', 'This week', 'Pending clarification'] as const;

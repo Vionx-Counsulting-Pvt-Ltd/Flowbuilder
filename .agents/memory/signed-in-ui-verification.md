@@ -14,3 +14,9 @@ Before a browser test mutates data, verify that the app's current member matches
 **Why:** Fresh accounts receive realistic starter workflows and requests, so a populated dashboard is not evidence that login reached somebody else's workspace. Testing guidance about overriding claims can also be mistaken for a requirement to pass unsupported arbitrary JWT fields; use the helper's documented identity parameters instead.
 
 **How to apply:** Confirm identity and tenant through the signed-in current-member response, not the dashboard title alone. If the requested identity was ignored, stop before changing data.
+
+Finish app edits before running signed-in browser verification; do not hot-update the app during the pass.
+
+**Why:** Vite can refresh the router and editor dependencies independently. Updating the app mid-test can change editor state or split shared navigation state across module versions, making a browser result unreliable.
+
+**How to apply:** Complete the coherent code batch and restart before the browser pass. If a fix is needed, finish it first, then have the existing tester reload once and verify the affected flow or continue previously untested flows.

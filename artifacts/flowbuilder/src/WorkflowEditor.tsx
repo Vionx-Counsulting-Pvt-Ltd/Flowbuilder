@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type FormEvent, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useParams } from 'wouter';
 import {
@@ -15,6 +15,9 @@ import { computeFormExpressions, evaluateExpression, expressionFunctions, valida
 import { useReferenceFields } from './lib/use-reference-fields';
 import FieldTableSource from './components/FieldTableSource';
 import TableChoiceMatch from './components/TableChoiceMatch';
+import { navigateWithoutGuard, registerNavigationBlocker } from './lib/guarded-location';
+import { workflowSnapshot } from './lib/workflow-snapshot';
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './components/ui/alert-dialog';
 
 type FieldType = WorkflowField['type'];
 const fieldTypes: { type: FieldType; label: string; icon: typeof Hash }[] = [
@@ -115,6 +118,9 @@ export default function WorkflowEditor() {
   const create = useCreateWorkflow();
   const update = useUpdateWorkflow();
   const [definition, setDefinition] = useState<WorkflowInput>(seed);
+  const [savedSnapshot, setSavedSnapshot] = useState(() => workflowSnapshot(definition));
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
+  const [createdWorkflowId, setCreatedWorkflowId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [search, setSearch] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -127,6 +133,33 @@ export default function WorkflowEditor() {
   const [publishConfirm, setPublishConfirm] = useState(false);
   const initializedFor = useRef<string | null>(null);
   const busy = create.isPending || update.isPending;
+  const snapshot = workflowSnapshot(definition);
+  const dirty = snapshot !== savedSnapshot;
+  const latestSnapshot = useRef(snapshot);
+  latestSnapshot.current = snapshot;
+  const leaving = useRef(false);
+  const unblockNavigation = useRef<() => void>(() => {});
+  function leaveEditor(leave: () => void) {
+    leaving.current = true;
+    unblockNavigation.current();
+    leave();
+  }
+  useLayoutEffect(() => {
+    if (!canBuild || (!dirty && !busy)) return;
+    const unregister = registerNavigationBlocker(leave => setPendingLeave(() => leave));
+    unblockNavigation.current = unregister;
+    return unregister;
+  }, [canBuild, dirty, busy]);
+  useEffect(() => {
+    if (!canBuild || (!dirty && !busy)) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      if (leaving.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [canBuild, dirty, busy]);
   const references = useReferenceFields(definition.fields, canBuild);
   const resolvedFields = references.fields;
   const selected = resolvedFields.find(field => field.id === selectedId) || null;
@@ -135,9 +168,18 @@ export default function WorkflowEditor() {
   useEffect(() => {
     const key = workflowId || '__new__';
     if (initializedFor.current === key) return;
-    if (!workflowId) { setDefinition(seed()); initializedFor.current = key; return; }
+    leaving.current = false;
+    setCreatedWorkflowId(null);
+    setSaved(false);
+    setSaveError('');
+    if (!workflowId) {
+      const initial = seed();
+      setDefinition(initial); setSavedSnapshot(workflowSnapshot(initial));
+      initializedFor.current = key; return;
+    }
     if (detail.data) {
-      setDefinition({ name: detail.data.name, category: detail.data.category, description: detail.data.description, routing: detail.data.routing, fields: detail.data.fields, stages: detail.data.stages });
+      const initial = { name: detail.data.name, category: detail.data.category, description: detail.data.description, routing: detail.data.routing, fields: detail.data.fields, stages: detail.data.stages };
+      setDefinition(initial); setSavedSnapshot(workflowSnapshot(initial));
       setSelectedId(detail.data.fields[0]?.id || '');
       initializedFor.current = key;
     }
@@ -242,29 +284,37 @@ export default function WorkflowEditor() {
       stages: definition.stages.map((stage, index) => ({ ...stage, name: stage.name.trim(), order: index + 1, assigneeLabel: stage.assigneeType === 'manager' ? 'Manager' : stage.assigneeLabel, ...(stage.conditionFieldId ? {} : { conditionFieldId: null, conditionValue: null }) })),
     };
   }
-  function save(intent: 'draft' | 'publish' = 'draft') {
+  function save(intent: 'draft' | 'publish' = 'draft', leave?: () => void) {
     if (busy) return;
     setValidationIntent(intent);
     setValidated(true); setSaveError('');
     if ((intent === 'publish' || workflowStatus === 'active' ? issues : draftIssues).length) return;
     const data = payload();
+    const savingSnapshot = snapshot;
     const finish = (result: { id: string }) => {
       void qc.invalidateQueries({ queryKey: getListWorkflowsQueryKey() });
       void qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
       void qc.invalidateQueries({ queryKey: getGetWorkflowQueryKey(result.id) });
       setSaved(true);
-      if (!workflowId) setLocation(`/workflows/${result.id}/edit`);
+      setSavedSnapshot(savingSnapshot);
+      if (latestSnapshot.current !== savingSnapshot) return;
+      if (leave) {
+        setPendingLeave(null);
+        leaveEditor(leave);
+      } else if (!workflowId) navigateWithoutGuard(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/workflows/${result.id}/edit`, { replace: true });
     };
-    if (workflowId) {
+    const savingId = workflowId || createdWorkflowId;
+    if (savingId) {
       const updateData = { ...data, status: intent === 'publish' ? 'active' as const : workflowStatus === 'active' ? 'active' as const : 'draft' as const };
-      update.mutate({ workflowId, data: updateData }, { onSuccess: finish, onError: error => setSaveError(saveFailureMessage(error, 'The workflow could not be saved. Please try again.')) });
+      update.mutate({ workflowId: savingId, data: updateData }, { onSuccess: finish, onError: error => setSaveError(saveFailureMessage(error, 'The workflow could not be saved. Please try again.')) });
     } else {
       create.mutate({ data }, {
         onSuccess: result => {
+          setCreatedWorkflowId(result.id);
           if (intent === 'publish') {
             update.mutate({ workflowId: result.id, data: { ...data, status: 'active' } }, {
               onSuccess: finish,
-              onError: error => { setSaveError(`The workflow was saved as a draft, but publishing failed: ${saveFailureMessage(error, 'Please try again.')}`); setLocation(`/workflows/${result.id}/edit`); },
+              onError: error => { setSavedSnapshot(savingSnapshot); setSaveError(`The workflow was saved as a draft, but publishing failed: ${saveFailureMessage(error, 'Please try again.')}`); },
             });
           } else finish(result);
         },
@@ -295,7 +345,7 @@ export default function WorkflowEditor() {
       <button className="fb-back" type="button" onClick={() => setLocation('/workflows')} data-testid="button-editor-back"><ArrowLeft size={16} /><span>Workflows</span></button>
       <div className="fb-breadcrumb"><span>WORKFLOW BUILDER</span><i>/</i><b>{workflowId ? 'EDIT' : 'NEW FORM'}</b></div>
       <div className="fb-actions">
-        <span className={`fb-save-state ${saved ? 'is-saved' : ''}`} aria-live="polite">{saved ? <><Check size={13} /> Saved just now</> : workflowStatus === 'active' ? 'Published workflow' : 'Draft definition'}</span>
+        <span className={`fb-save-state ${saved && !dirty ? 'is-saved' : ''}`} aria-live="polite">{dirty ? 'Unsaved changes' : saved ? <><Check size={13} /> Saved just now</> : workflowStatus === 'active' ? 'Published workflow' : 'Draft definition'}</span>
         <Button className="button-outline fb-preview-button" type="button" aria-label="Preview workflow" onClick={() => setPreviewOpen(true)} data-testid="button-preview"><Eye size={15} /><span className="fb-action-label">Preview</span></Button>
         <Button className="button-outline fb-save-button" type="button" aria-label={busy ? 'Saving workflow' : workflowStatus === 'active' ? 'Save changes' : 'Save draft'} disabled={busy} onClick={() => save('draft')} data-testid="button-save-draft"><span className="fb-action-label">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save changes' : 'Save draft'}</span></Button>
         <Button className="button-primary fb-publish-button" type="button" aria-label={busy ? 'Publishing workflow' : workflowStatus === 'active' ? 'Save and publish workflow' : 'Publish workflow'} disabled={busy} onClick={requestPublish} data-testid="button-publish"><span className="fb-action-label">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save & publish' : 'Publish'}</span><ArrowRight size={15} /></Button>
@@ -303,11 +353,11 @@ export default function WorkflowEditor() {
     </header>
     {validated && actionIssues.length > 0 && <section className="fb-action-errors" role="alert" data-testid="workflow-action-errors"><b>{validationIntent === 'publish' ? 'Before publishing, fix these details:' : 'Before saving, fix these details:'}</b><ul>{actionIssues.map(issue => <li key={issue}>{issue}</li>)}</ul></section>}
     <form id="workflow-definition" onSubmit={submitDraft}>
-      <div className="fb-titlebar">
+      <div className="fb-titlebar" inert={busy}>
         <div className="fb-title-copy"><div className="eyebrow">FORM DESIGNER <span>·</span> {workflowStatus === 'active' ? 'LIVE WORKFLOW' : 'UNPUBLISHED'}</div><input className="fb-name-input" value={definition.name} onChange={e => { setDefinition(value => ({ ...value, name: e.target.value })); setSaved(false); }} placeholder="Untitled workflow" aria-label="Workflow name" data-testid="input-workflow-name" /><span className="fb-title-sub">Shape the request first. Route it when it’s ready.</span></div>
         <div className="fb-title-meta"><Label title="Category"><input className={inputClass} value={definition.category} onChange={e => setDefinition(value => ({ ...value, category: e.target.value }))} placeholder="Operations" data-testid="input-workflow-category" /></Label><Label title="Routing"><select className={inputClass} value={definition.routing} onChange={e => setDefinition(value => ({ ...value, routing: e.target.value as WorkflowInput['routing'] }))} data-testid="select-routing-style"><option value="sequential">Sequential</option><option value="parallel">Parallel</option><option value="conditional">Conditional</option></select></Label></div>
       </div>
-      <div className="fb-workspace">
+      <div className="fb-workspace" inert={busy}>
         <aside className="fb-palette">
           <div className="fb-panel-heading"><div><span className="section-label">BUILDING BLOCKS</span><h2>Field types</h2></div><span className="fb-count">{definition.fields.length}</span></div>
           <label className="fb-search"><Search size={14} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Find a field…" aria-label="Search field types" data-testid="input-search-field-types" /></label>
@@ -373,6 +423,20 @@ export default function WorkflowEditor() {
       </div>
     </form>
     {saveError && <div className="fb-toast-error" role="alert"><CircleAlert size={16} />{saveError}<button type="button" onClick={() => setSaveError('')} aria-label="Dismiss error"><X size={15} /></button></div>}
+    <AlertDialog open={Boolean(pendingLeave)} onOpenChange={open => { if (!open && !busy) setPendingLeave(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>Leave with unsaved changes?</AlertDialogTitle><AlertDialogDescription>
+          {workflowStatus === 'active' ? 'Save changes to the live workflow before leaving, or discard your edits. Live changes must pass all publication checks.' : 'Save your unfinished draft before leaving, or discard your edits.'}
+        </AlertDialogDescription></AlertDialogHeader>
+        {validated && actionIssues.length > 0 && <ul className="form-error" role="alert">{actionIssues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
+        {saveError && <p className="form-error" role="alert">{saveError}</p>}
+        <AlertDialogFooter>
+          <Button type="button" className="button-outline" autoFocus disabled={busy} onClick={() => setPendingLeave(null)} data-testid="button-unsaved-stay">Stay</Button>
+          <Button type="button" className="button-outline" disabled={busy} onClick={() => { const leave = pendingLeave; setPendingLeave(null); if (leave) leaveEditor(leave); }} data-testid="button-unsaved-discard">Discard and leave</Button>
+          <Button type="button" className="button-primary" disabled={busy} onClick={() => pendingLeave && save('draft', pendingLeave)} data-testid="button-unsaved-save">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save changes and leave' : 'Save draft and leave'}</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     {publishConfirm && <div className="fb-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPublishConfirm(false); }}><section className="fb-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="publish-title"><span className="fb-modal-icon"><ShieldCheck size={19} /></span><h2 id="publish-title">Publish this workflow?</h2><p>{workflowStatus === 'active' ? 'Your updates will become the live request form.' : 'Requesters will be able to submit this form as soon as it is published.'}</p><div className="fb-modal-actions"><Button className="button-outline" type="button" onClick={() => setPublishConfirm(false)} data-testid="button-cancel-publish">Keep editing</Button><Button className="button-primary" type="button" disabled={busy} onClick={submitPublish} data-testid="button-confirm-publish">{busy ? 'Publishing…' : 'Publish workflow'} <ArrowRight size={14} /></Button></div></section></div>}
     {previewOpen && <div className="fb-modal-backdrop fb-preview-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPreviewOpen(false); }}><section className="fb-preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title"><header className="fb-preview-modal-head"><div><span className="section-label">REQUESTER VIEW</span><h2 id="preview-title">{definition.name || 'Untitled workflow'}</h2><p>{definition.description || 'This is the form requesters will see.'}</p></div><button type="button" className="fb-modal-close" onClick={() => setPreviewOpen(false)} aria-label="Close preview" data-testid="button-close-preview"><X size={19} /></button></header><div className="fb-preview-body"><div className="fb-preview-category">{definition.category} <span>·</span> {resolvedFields.length} fields</div>{resolvedFields.filter(field => isPreviewFieldVisible(field, resolvedFields, previewValues, previewUser)).map(field => <div className="fb-preview-input" key={field.id}><label htmlFor={`test-${field.id}`}>{field.label || 'Untitled field'}{field.required && <i>Required</i>}</label>{field.helpText && <small>{field.helpText}</small>}<PreviewControl field={field} value={previewValues[field.id]} people={users.data ?? []} onChange={value => setTestValues(values => ({ ...values, [field.id]: value }))} error={previewErrors[field.id]} /></div>)}{!resolvedFields.length && <div className="fb-preview-empty">Your form has no fields yet. Add questions in the builder to see them here.</div>}<div className="fb-preview-footer"><Button type="button" className="button-primary" onClick={validatePreview} data-testid="button-test-preview">Check answers <ArrowRight size={14} /></Button><span>This preview won’t submit a request.</span></div></div></section></div>}
   </div>;
