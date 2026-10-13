@@ -87,6 +87,8 @@ export type WorkflowField = {
   optionLabels?: Record<string, string>;
   referenceColumns?: { key: string; label: string }[];
   referenceData?: Record<string, Record<string, string | number | boolean | null>>;
+  referenceMappings?: { sourceColumn: string; targetFieldId: string; mode: "suggestion" | "locked" }[];
+  optionMappedValues?: Record<string, Record<string, string | number | boolean | null>>;
 };
 
 export type WorkflowStage = {

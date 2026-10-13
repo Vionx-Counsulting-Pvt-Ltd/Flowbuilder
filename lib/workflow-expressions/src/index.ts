@@ -1,3 +1,5 @@
+export * from "./reference-mappings";
+
 export type ExpressionField = {
   id: string;
   key?: string | null;

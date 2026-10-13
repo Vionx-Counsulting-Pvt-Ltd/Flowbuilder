@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { FieldCondition } from './fieldCondition';
+import type { ReferenceFieldMapping } from './referenceFieldMapping';
 import type { WorkflowFieldOptionLabels } from './workflowFieldOptionLabels';
+import type { WorkflowFieldOptionMappedValues } from './workflowFieldOptionMappedValues';
 import type { WorkflowFieldReferenceColumnsItem } from './workflowFieldReferenceColumnsItem';
 import type { WorkflowFieldReferenceData } from './workflowFieldReferenceData';
 import type { WorkflowFieldType } from './workflowFieldType';
@@ -23,6 +25,10 @@ export interface WorkflowField {
   sourceTableId?: string | null;
   /** @nullable */
   sourceLabelColumn?: string | null;
+  /** @maxItems 50 */
+  referenceMappings?: ReferenceFieldMapping[];
+  /** Server-owned projection containing only explicitly mapped target answers. */
+  optionMappedValues?: WorkflowFieldOptionMappedValues;
   referenceColumns?: WorkflowFieldReferenceColumnsItem[];
   referenceData?: WorkflowFieldReferenceData;
   optionLabels?: WorkflowFieldOptionLabels;

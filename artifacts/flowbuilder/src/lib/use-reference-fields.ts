@@ -22,10 +22,12 @@ export function useReferenceFields(fields: WorkflowField[], enabled: boolean) {
     const requested = source.data.columns.filter(column => dereferences.some(ref =>
       [field.id, field.key, field.label].some(name => name?.trim().toLocaleLowerCase() === ref.field.toLocaleLowerCase()) &&
       [column.key, column.label].some(name => name.trim().toLocaleLowerCase() === ref.column.toLocaleLowerCase())));
+    const optionMappedValues = Object.fromEntries(rows.map(row => [row.id, Object.fromEntries((field.referenceMappings ?? []).map(mapping => [mapping.targetFieldId, row.values[mapping.sourceColumn] ?? null]))]));
     return {
       ...field,
       options: rows.map(row => row.id),
       optionLabels: Object.fromEntries(rows.map(row => [row.id, String(row.values[column!.key])])),
+      optionMappedValues,
       referenceColumns: source.data.columns.map(({ key, label }) => ({ key, label })),
       referenceData: Object.fromEntries(rows.map(row => [row.id, Object.fromEntries(requested.map(column => [column.key, row.values[column.key] ?? null]))])),
     };

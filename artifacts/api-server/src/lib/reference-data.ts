@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, referenceRowsTable, referenceTablesTable, type ReferenceColumn, type ReferenceValues, type WorkflowField } from "@workspace/db";
-import { getFormDereferences } from "@workspace/workflow-expressions";
+import { getFormDereferences, referenceColumnCompatible, applyLockedReferenceMappings } from "@workspace/workflow-expressions";
 
 export class ReferenceDataError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -58,10 +58,30 @@ export async function hydrateReferenceFields(tenantId: string, fields: WorkflowF
   fields = storedReferenceFields(fields);
   const dereferences = getFormDereferences(fields);
   const ids = [...new Set(fields.map(field => field.sourceTableId).filter((id): id is string => Boolean(id)))];
-  if (!ids.length) return fields;
-  const tables = await db.select().from(referenceTablesTable).where(and(eq(referenceTablesTable.tenantId, tenantId), inArray(referenceTablesTable.id, ids)));
+  const tables = ids.length ? await db.select().from(referenceTablesTable).where(and(eq(referenceTablesTable.tenantId, tenantId), inArray(referenceTablesTable.id, ids))) : [];
   const rows = tables.length ? await db.select().from(referenceRowsTable).where(and(inArray(referenceRowsTable.tableId, tables.map(table => table.id)), eq(referenceRowsTable.active, true))).orderBy(asc(referenceRowsTable.createdAt), asc(referenceRowsTable.id)) : [];
+  const targets = new Set<string>();
+  const mappingsBySource = new Map<string, NonNullable<WorkflowField["referenceMappings"]>>();
+  for (const field of fields) {
+    const validMappings: NonNullable<WorkflowField["referenceMappings"]> = [];
+    for (const mapping of field.referenceMappings ?? []) {
+      const column = tables.find(table => table.id === field.sourceTableId)?.columns.find(column => column.key === mapping.sourceColumn);
+      const target = fields.find(target => target.id === mapping.targetFieldId);
+      const valid = field.sourceTableId && !field.appFormula?.trim() && ["select", "enum", "ref", "lookup", "radio"].includes(field.type)
+        && column && target && target.id !== field.id && !targets.has(target.id)
+        && !["__proto__", "constructor", "prototype"].includes(target.id)
+        && ["suggestion", "locked"].includes(mapping.mode) && referenceColumnCompatible(column.type, target);
+      if (!valid) {
+        if (strict) throw new ReferenceDataError(`Invalid related-field mapping on “${field.label}”. Use a compatible editable target, one source per target, and a single-row choice.`);
+        continue;
+      }
+      targets.add(target!.id);
+      validMappings.push(mapping);
+    }
+    mappingsBySource.set(field.id, validMappings);
+  }
   return fields.map(field => {
+    field = { ...field, referenceMappings: mappingsBySource.get(field.id) };
     if (!field.sourceTableId) {
       const { optionLabels: _labels, ...manual } = field;
       return manual;
@@ -70,24 +90,42 @@ export async function hydrateReferenceFields(tenantId: string, fields: WorkflowF
     const column = table?.columns.find(item => item.key === field.sourceLabelColumn);
     if (!referenceChoiceTypes.has(field.type) || !table || !column) {
       if (strict) throw new ReferenceDataError(`Choose an available table and display column for “${field.label}”.`);
-      return { ...field, options: [], optionLabels: {} };
+      return { ...field, options: [], optionLabels: {}, optionMappedValues: {} };
     }
     const choices = rows.filter(row => row.tableId === table.id && row.values[column.key] != null && String(row.values[column.key]).trim() !== "");
     const requested = table.columns.filter(column => dereferences.some(ref =>
       [field.id, field.key, field.label].some(name => name?.trim().toLocaleLowerCase() === ref.field.toLocaleLowerCase()) &&
       [column.key, column.label].some(name => name.trim().toLocaleLowerCase() === ref.column.toLocaleLowerCase())));
+    const optionMappedValues = Object.fromEntries(choices.map(row => [row.id, Object.fromEntries((field.referenceMappings ?? []).map(mapping => {
+      const sourceColumn = table.columns.find(column => column.key === mapping.sourceColumn)!;
+      const value = normalizeReferenceValues({ [sourceColumn.key]: row.values[sourceColumn.key] }, [{ ...sourceColumn, required: false }])[sourceColumn.key];
+      const target = fields.find(target => target.id === mapping.targetFieldId)!;
+      if (target.type === "number" && value != null && !Number.isInteger(value)) throw new ReferenceDataError(`“${target.label}” needs a whole-number source value.`);
+      return [mapping.targetFieldId, value];
+    }))]));
     return {
       ...field,
       options: choices.map(row => row.id),
       optionLabels: Object.fromEntries(choices.map(row => [row.id, String(row.values[column.key])])),
+      optionMappedValues,
       referenceColumns: (strict ? table.columns : requested).map(({ key, label }) => ({ key, label })),
       referenceData: requested.length ? Object.fromEntries(choices.map(row => [row.id, Object.fromEntries(requested.map(column => [column.key, row.values[column.key] ?? null]))])) : {},
     };
   });
 }
+export function authoritativeReferenceAnswers(fields: WorkflowField[], values: Record<string, unknown>) {
+  for (const field of fields) {
+    if (!field.referenceMappings?.length) continue;
+    const selection = values[field.id];
+    if (selection != null && selection !== "" && (typeof selection !== "string" || !field.options?.includes(selection))) {
+      throw new ReferenceDataError(`Choose an active, available row for “${field.label}”.`);
+    }
+  }
+  return applyLockedReferenceMappings(fields, values);
+}
 export function storedReferenceFields(fields: WorkflowField[]): WorkflowField[] {
   return fields.map(field => {
-    const { optionLabels: _labels, referenceData: _data, referenceColumns: _columns, ...definition } = field;
+    const { optionLabels: _labels, optionMappedValues: _projection, referenceData: _data, referenceColumns: _columns, ...definition } = field;
     return field.sourceTableId ? { ...definition, options: [] } : definition;
   });
 }
@@ -96,6 +134,9 @@ export function storedReferenceFields(fields: WorkflowField[]): WorkflowField[] 
 export function snapshotReferenceFields(fields: WorkflowField[], values: Record<string, unknown>): WorkflowField[] {
   const refs = getFormDereferences(fields);
   return fields.map(field => {
+    // Mapped answers are already in formData; do not retain other rows' projections.
+    const { optionMappedValues: _projection, ...snapshot } = field;
+    field = snapshot;
     if (!field.sourceTableId) return field;
     const selected = values[field.id];
     const row = typeof selected === "string" && field.referenceData && Object.prototype.hasOwnProperty.call(field.referenceData, selected) ? field.referenceData[selected] : undefined;

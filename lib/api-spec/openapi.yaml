@@ -697,6 +697,13 @@ components:
     RoutingType:
       type: string
       enum: [sequential, parallel, conditional]
+    ReferenceFieldMapping:
+      type: object
+      required: [sourceColumn, targetFieldId, mode]
+      properties:
+        sourceColumn: { type: string, minLength: 1 }
+        targetFieldId: { type: string, minLength: 1 }
+        mode: { type: string, enum: [suggestion, locked] }
     WorkflowField:
       type: object
       required: [id, label, type, required]
@@ -711,6 +718,18 @@ components:
           items: { type: string }
         sourceTableId: { type: ["string", "null"] }
         sourceLabelColumn: { type: ["string", "null"] }
+        referenceMappings:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/ReferenceFieldMapping"
+        optionMappedValues:
+          description: Server-owned projection containing only explicitly mapped target answers.
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: ["string", "number", "boolean", "null"]
         referenceColumns:
           type: array
           items:

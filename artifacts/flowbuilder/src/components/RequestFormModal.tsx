@@ -13,7 +13,7 @@ import {
   useRequestUploadUrl,
 } from "@workspace/api-client-react";
 import type { Workflow, WorkflowField } from "@workspace/api-client-react";
-import { computeFormExpressions, evaluateExpression, type ExpressionContext, type ExpressionUser } from "@workspace/workflow-expressions";
+import { applyLockedReferenceMappings, fillReferenceSelection, computeFormExpressions, evaluateExpression, type ExpressionContext, type ExpressionUser } from "@workspace/workflow-expressions";
 import { ArrowRight, LoaderCircle, MapPin, Paperclip, X } from "lucide-react";
 
 type UploadedWorkflowFile = { fileId: string; name: string; contentType: string; size: number };
@@ -158,18 +158,22 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
   const [locatingField, setLocatingField] = useState<string | null>(null);
   const computedValues = useMemo(() => {
     const fields = selected?.fields ?? [];
-    try { return computeFormExpressions(fields, values, expressionUser); } catch { return values; }
+    const mapped = applyLockedReferenceMappings(fields, values);
+    try { return computeFormExpressions(fields, mapped, expressionUser); } catch { return mapped; }
   }, [values, selected?.fields, expressionUser]);
 
   useEffect(() => {
     if (current.isLoading) return;
-    setValues(initialValues(selected?.fields ?? [], expressionUser));
+    const fields = selected?.fields ?? [];
+    let initial = initialValues(fields, expressionUser);
+    for (const source of fields) if (source.referenceMappings?.length) initial = fillReferenceSelection(fields, initial, source.id, initial[source.id]);
+    setValues(initial);
     setErrors({});
     setUploadErrors({});
   }, [workflowId, selected?.id, expressionUser, current.isLoading]);
 
   function updateValue(id: string, value: unknown) {
-    setValues(current => ({ ...current, [id]: value }));
+    setValues(current => fillReferenceSelection(selected?.fields ?? [], current, id, value));
     setErrors(current => ({ ...current, [id]: "" }));
   }
 
@@ -327,11 +331,13 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
           const value = computedValues[field.id];
           const required = field.required || Boolean(evaluate(field.requiredIf, selected.fields, { ...computedValues, _THIS: value }, false, expressionUser));
           if (field.type === "show") return <div key={field.id} className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm" data-testid={`show-request-${field.id}`}><strong>{field.label}</strong>{field.helpText && <p className="mt-1 text-muted-foreground">{field.helpText}</p>}{field.placeholder && <p className="mt-1">{field.placeholder}</p>}</div>;
-          const disabled = Boolean(field.readOnly || field.appFormula);
+          const mapping = selected.fields.flatMap(source => source.referenceMappings ?? []).find(mapping => mapping.targetFieldId === field.id);
+          const disabled = Boolean(field.readOnly || field.appFormula || mapping?.mode === "locked");
           return <div className="form-field block" key={field.id}>
             <label htmlFor={`request-${field.id}`}><span>{field.label}{required ? " *" : ""}</span></label>
             {field.prefix || field.suffix ? <div className="flex items-center gap-2">{field.prefix && <span className="text-xs text-muted-foreground">{field.prefix}</span>}{renderControl(field, value, disabled, required)}{field.suffix && <span className="text-xs text-muted-foreground">{field.suffix}</span>}</div> : renderControl(field, value, disabled, required)}
             {field.appFormula && <small>Calculated automatically; the server recomputes this value on submission.</small>}
+            {mapping && <small>{mapping.mode === "locked" ? "Filled from the selected table row; locked and verified on submission." : "Suggested from the selected table row; you can edit this answer."}</small>}
             {field.helpText && <small>{field.helpText}</small>}
             {errors[field.id] && <small className="form-error" data-testid={`error-request-${field.id}`}>{errors[field.id]}</small>}
           </div>;

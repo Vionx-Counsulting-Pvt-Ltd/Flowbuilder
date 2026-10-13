@@ -81,7 +81,7 @@ import {
 } from "../lib/flowbuilder-auth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { allocateRequestReference } from "../lib/request-reference";
-import { hydrateReferenceFields, ReferenceDataError, snapshotReferenceFields, storedReferenceFields } from "../lib/reference-data";
+import { authoritativeReferenceAnswers, hydrateReferenceFields, ReferenceDataError, snapshotReferenceFields, storedReferenceFields } from "../lib/reference-data";
 import type {
   WorkflowField,
   WorkflowStage,
@@ -1131,7 +1131,13 @@ router.get("/workflows", async (_req, res): Promise<void> => {
           hasPermission(member, "build") ||
           member.roleName === "Workflow Owner",
       );
-  const result = await Promise.all(visible.map(workflowResponse));
+  const result = await Promise.all(visible.map(async workflow => {
+    const response = await workflowResponse(workflow);
+    if (workflow.status !== "active" && !hasPermission(member, "build") && !isOrgAdmin(member) && member.roleName !== "Workflow Owner") {
+      response.fields = response.fields.map(({ optionMappedValues: _projection, ...field }) => field);
+    }
+    return response;
+  }));
   res.json(ListWorkflowsResponse.parse(result));
 });
 
@@ -1206,7 +1212,11 @@ router.get("/workflows/:workflowId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Workflow not found." });
     return;
   }
-  res.json(GetWorkflowResponse.parse(await workflowResponse(workflow)));
+  const response = await workflowResponse(workflow);
+  if (workflow.status !== "active" && !hasPermission(member, "build") && !isOrgAdmin(member) && member.roleName !== "Workflow Owner") {
+    response.fields = response.fields.map(({ optionMappedValues: _projection, ...field }) => field);
+  }
+  res.json(GetWorkflowResponse.parse(response));
 });
 
 router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
@@ -1394,6 +1404,7 @@ router.post("/requests", async (req, res): Promise<void> => {
   }
   let calculatedData: Record<string, unknown>;
   try {
+    Object.assign(submissionData, authoritativeReferenceAnswers(workflow.fields, submissionData));
     calculatedData = computeFormExpressions(
       workflow.fields,
       submissionData,

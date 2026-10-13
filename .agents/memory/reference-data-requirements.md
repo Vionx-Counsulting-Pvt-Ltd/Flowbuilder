@@ -34,3 +34,9 @@ Use stable row references for selected values and preserve submission-time displ
 **Why:** Reference labels can be renamed or retired after a request is submitted. A label change must not change which record was selected or rewrite the original request's displayed answer.
 
 **How to apply:** Refresh available labels for new forms while retaining historical labels in submitted records. Keep raw table management restricted to builders and admins; ordinary requesters need only the linked field's choices.
+
+Changing or clearing a reference selection must replace or clear its copied suggestions, even if the requester edited them. Explain this alongside the mappings rather than silently preserving edits.
+
+**Why:** Preserving an edited branch code or region after switching branches risks submitting internally inconsistent answers. Suggestions remain editable only for the current selection; locked copies must reflect the authoritative row at submission.
+
+**How to apply:** Keep this behavior consistent when extending related-field filling. Historical submitted answers remain snapshots, not live references.

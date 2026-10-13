@@ -120,6 +120,22 @@ export const RoutingType = {
   conditional: 'conditional',
 } as const;
 
+export type ReferenceFieldMappingMode = typeof ReferenceFieldMappingMode[keyof typeof ReferenceFieldMappingMode];
+
+
+export const ReferenceFieldMappingMode = {
+  suggestion: 'suggestion',
+  locked: 'locked',
+} as const;
+
+export interface ReferenceFieldMapping {
+  /** @minLength 1 */
+  sourceColumn: string;
+  /** @minLength 1 */
+  targetFieldId: string;
+  mode: ReferenceFieldMappingMode;
+}
+
 export type WorkflowFieldType = typeof WorkflowFieldType[keyof typeof WorkflowFieldType];
 
 
@@ -164,6 +180,11 @@ export const WorkflowFieldType = {
   show: 'show',
 } as const;
 
+/**
+ * Server-owned projection containing only explicitly mapped target answers.
+ */
+export type WorkflowFieldOptionMappedValues = {[key: string]: {[key: string]: string | number | boolean | null}};
+
 export type WorkflowFieldReferenceColumnsItem = {
   key: string;
   label: string;
@@ -200,6 +221,10 @@ export interface WorkflowField {
   sourceTableId?: string | null;
   /** @nullable */
   sourceLabelColumn?: string | null;
+  /** @maxItems 50 */
+  referenceMappings?: ReferenceFieldMapping[];
+  /** Server-owned projection containing only explicitly mapped target answers. */
+  optionMappedValues?: WorkflowFieldOptionMappedValues;
   referenceColumns?: WorkflowFieldReferenceColumnsItem[];
   referenceData?: WorkflowFieldReferenceData;
   optionLabels?: WorkflowFieldOptionLabels;

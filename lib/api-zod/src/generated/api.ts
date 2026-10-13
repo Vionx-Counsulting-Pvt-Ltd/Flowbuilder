@@ -425,6 +425,10 @@ export const GetDashboardResponse = zod.object({
 /**
  * @summary List workflows available in the current workspace
  */
+
+
+export const listWorkflowsResponseFieldsItemReferenceMappingsMax = 50;
+
 export const listWorkflowsResponseFieldsItemWidthMax = 6;
 
 export const listWorkflowsResponseFieldsItemMinLengthMin = 0;
@@ -455,6 +459,12 @@ export const ListWorkflowsResponseItem = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(listWorkflowsResponseFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -514,6 +524,10 @@ export const ListWorkflowsResponse = zod.array(ListWorkflowsResponseItem)
  */
 export const createWorkflowBodyNameMin = 2;
 
+
+
+export const createWorkflowBodyFieldsItemReferenceMappingsMax = 50;
+
 export const createWorkflowBodyFieldsItemWidthMax = 6;
 
 export const createWorkflowBodyFieldsItemMinLengthMin = 0;
@@ -542,6 +556,12 @@ export const CreateWorkflowBody = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(createWorkflowBodyFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -589,6 +609,10 @@ export const CreateWorkflowBody = zod.object({
 })).min(1)
 })
 
+
+
+export const createWorkflowResponseFieldsItemReferenceMappingsMax = 50;
+
 export const createWorkflowResponseFieldsItemWidthMax = 6;
 
 export const createWorkflowResponseFieldsItemMinLengthMin = 0;
@@ -619,6 +643,12 @@ export const CreateWorkflowResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(createWorkflowResponseFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -679,6 +709,10 @@ export const GetWorkflowParams = zod.object({
   "workflowId": zod.coerce.string()
 })
 
+
+
+export const getWorkflowResponseFieldsItemReferenceMappingsMax = 50;
+
 export const getWorkflowResponseFieldsItemWidthMax = 6;
 
 export const getWorkflowResponseFieldsItemMinLengthMin = 0;
@@ -709,6 +743,12 @@ export const GetWorkflowResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(getWorkflowResponseFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -771,6 +811,10 @@ export const UpdateWorkflowParams = zod.object({
 
 export const updateWorkflowBodyNameMin = 2;
 
+
+
+export const updateWorkflowBodyFieldsItemReferenceMappingsMax = 50;
+
 export const updateWorkflowBodyFieldsItemWidthMax = 6;
 
 export const updateWorkflowBodyFieldsItemMinLengthMin = 0;
@@ -800,6 +844,12 @@ export const UpdateWorkflowBody = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(updateWorkflowBodyFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -847,6 +897,10 @@ export const UpdateWorkflowBody = zod.object({
 })).min(1).optional()
 })
 
+
+
+export const updateWorkflowResponseFieldsItemReferenceMappingsMax = 50;
+
 export const updateWorkflowResponseFieldsItemWidthMax = 6;
 
 export const updateWorkflowResponseFieldsItemMinLengthMin = 0;
@@ -877,6 +931,12 @@ export const UpdateWorkflowResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(updateWorkflowResponseFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -974,6 +1034,10 @@ export const CreateRequestBody = zod.object({
   "formData": zod.record(zod.string(), zod.unknown())
 })
 
+
+
+export const createRequestResponseTwoFieldsItemReferenceMappingsMax = 50;
+
 export const createRequestResponseTwoFieldsItemWidthMax = 6;
 
 export const createRequestResponseTwoFieldsItemMinLengthMin = 0;
@@ -1012,6 +1076,12 @@ export const CreateRequestResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(createRequestResponseTwoFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -1074,6 +1144,10 @@ export const GetRequestParams = zod.object({
   "requestId": zod.coerce.number().int()
 })
 
+
+
+export const getRequestResponseTwoFieldsItemReferenceMappingsMax = 50;
+
 export const getRequestResponseTwoFieldsItemWidthMax = 6;
 
 export const getRequestResponseTwoFieldsItemMinLengthMin = 0;
@@ -1112,6 +1186,12 @@ export const GetRequestResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(getRequestResponseTwoFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
@@ -1179,6 +1259,10 @@ export const ActOnRequestBody = zod.object({
   "comment": zod.string().nullish()
 })
 
+
+
+export const actOnRequestResponseTwoFieldsItemReferenceMappingsMax = 50;
+
 export const actOnRequestResponseTwoFieldsItemWidthMax = 6;
 
 export const actOnRequestResponseTwoFieldsItemMinLengthMin = 0;
@@ -1217,6 +1301,12 @@ export const ActOnRequestResponse = zod.object({
   "options": zod.array(zod.string()).optional(),
   "sourceTableId": zod.string().nullish(),
   "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(actOnRequestResponseTwoFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
   "referenceColumns": zod.array(zod.object({
   "key": zod.string(),
   "label": zod.string()
