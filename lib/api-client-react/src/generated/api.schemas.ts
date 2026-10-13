@@ -5,6 +5,87 @@
  * FlowBuilder workflow, request, team, and reporting API
  * OpenAPI spec version: 0.2.0
  */
+export type ReferenceColumnType = typeof ReferenceColumnType[keyof typeof ReferenceColumnType];
+
+
+export const ReferenceColumnType = {
+  text: 'text',
+  number: 'number',
+  date: 'date',
+  boolean: 'boolean',
+} as const;
+
+export interface ReferenceColumn {
+  /**
+     * @minLength 1
+     * @maxLength 50
+     * @pattern ^[a-zA-Z][a-zA-Z0-9_]*$
+     */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  label: string;
+  type: ReferenceColumnType;
+  required: boolean;
+}
+
+export interface ReferenceValues {[key: string]: string | number | boolean | null}
+
+export interface ReferenceTableInput {
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  name: string;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 20
+     */
+  columns: ReferenceColumn[];
+}
+
+export interface ReferenceTable {
+  id: string;
+  name: string;
+  description: string;
+  columns: ReferenceColumn[];
+  rowCount: number;
+  activeRowCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReferenceRow {
+  id: string;
+  values: ReferenceValues;
+  active: boolean;
+}
+
+export type ReferenceTableDetail = ReferenceTable & {
+  rows: ReferenceRow[];
+};
+
+export interface ReferenceRowInput {
+  values: ReferenceValues;
+  active?: boolean;
+}
+
+export interface ReferenceRowsInput {
+  /**
+     * @minItems 1
+     * @maxItems 5000
+     */
+  rows: ReferenceRowInput[];
+}
+
+export interface ReferenceDeleteResult {
+  deleted: boolean;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -83,6 +164,8 @@ export const WorkflowFieldType = {
   show: 'show',
 } as const;
 
+export type WorkflowFieldOptionLabels = {[key: string]: string};
+
 export type FieldConditionOperator = typeof FieldConditionOperator[keyof typeof FieldConditionOperator];
 
 
@@ -106,6 +189,11 @@ export interface WorkflowField {
   /** @nullable */
   placeholder?: string | null;
   options?: string[];
+  /** @nullable */
+  sourceTableId?: string | null;
+  /** @nullable */
+  sourceLabelColumn?: string | null;
+  optionLabels?: WorkflowFieldOptionLabels;
   /** @nullable */
   key?: string | null;
   /** @nullable */

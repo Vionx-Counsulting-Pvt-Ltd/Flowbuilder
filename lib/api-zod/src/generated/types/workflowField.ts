@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { FieldCondition } from './fieldCondition';
+import type { WorkflowFieldOptionLabels } from './workflowFieldOptionLabels';
 import type { WorkflowFieldType } from './workflowFieldType';
 
 export interface WorkflowField {
@@ -16,6 +17,11 @@ export interface WorkflowField {
   /** @nullable */
   placeholder?: string | null;
   options?: string[];
+  /** @nullable */
+  sourceTableId?: string | null;
+  /** @nullable */
+  sourceLabelColumn?: string | null;
+  optionLabels?: WorkflowFieldOptionLabels;
   /** @nullable */
   key?: string | null;
   /** @nullable */

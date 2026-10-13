@@ -45,6 +45,7 @@
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@types/node": "catalog:",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
@@ -77,6 +78,8 @@
   "dependencies": {
     "@clerk/react": "^6.17.8",
     "@clerk/themes": "^2.4.57",
-    "@workspace/workflow-expressions": "workspace:*"
+    "@workspace/workflow-expressions": "workspace:*",
+    "papaparse": "^5.7.0",
+    "read-excel-file": "^9.3.12"
   }
 }

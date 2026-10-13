@@ -82,6 +82,9 @@ export type WorkflowField = {
     value: string;
   } | null;
   options?: string[];
+  sourceTableId?: string | null;
+  sourceLabelColumn?: string | null;
+  optionLabels?: Record<string, string>;
 };
 
 export type WorkflowStage = {

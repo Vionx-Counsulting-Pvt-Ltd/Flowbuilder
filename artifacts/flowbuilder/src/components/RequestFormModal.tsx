@@ -3,10 +3,12 @@ import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetDashboardQueryKey,
+  getGetWorkflowQueryKey,
   getGetReportOverviewQueryKey,
   getListRequestsQueryKey,
   useCreateRequest,
   useGetCurrentUser,
+  useGetWorkflow,
   useListPeople,
   useRequestUploadUrl,
 } from "@workspace/api-client-react";
@@ -135,6 +137,9 @@ function DrawingCapture({
 export default function RequestFormModal({ workflows, onClose }: { workflows: Workflow[]; onClose: () => void }) {
   const queryClient = useQueryClient();
   const create = useCreateRequest();
+  const failureData = create.error?.data;
+  const failureMessage = failureData && typeof failureData === "object" && "error" in failureData && typeof failureData.error === "string"
+    ? failureData.error : "Could not submit this request. Please check the fields and try again.";
   const current = useGetCurrentUser();
   const upload = useRequestUploadUrl();
   const people = useListPeople();
@@ -143,7 +148,8 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
     : undefined, [current.data?.email, current.data?.name, current.data?.roleName]);
   const [, setLocation] = useLocation();
   const [workflowId, setWorkflowId] = useState(workflows.find(workflow => workflow.status === "active")?.id ?? "");
-  const selected = workflows.find(workflow => workflow.id === workflowId);
+  const detail = useGetWorkflow(workflowId, { query: { queryKey: getGetWorkflowQueryKey(workflowId), enabled: Boolean(workflowId), staleTime: 0, refetchInterval: 15000 } });
+  const selected = detail.data ?? workflows.find(workflow => workflow.id === workflowId);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadError, setUploadError] = useState("");
@@ -212,7 +218,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected) return;
+    if (!selected || detail.isError || detail.isLoading) return;
     const fields = selected.fields;
     const nextErrors: Record<string, string> = {};
     for (const field of fields) {
@@ -274,11 +280,11 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
       const multiple = field.type === "people" && Boolean(field.multiple);
       return <select id={`request-${field.id}`} className="input-control" data-testid={dataTestId} disabled={disabled} required={required && !multiple} multiple={multiple} value={multiple ? Array.isArray(value) ? value as string[] : [] : String(value ?? "")} onChange={event => onChange(multiple ? Array.from(event.target.selectedOptions, option => option.value) : event.target.value)}>
         {!multiple && <option value="">{field.type === "people" ? "Choose a person" : "Choose an option"}</option>}
-        {field.type === "people" ? people.data?.map(person => <option key={person.id} value={person.id}>{person.name}</option>) : options.map(option => <option key={option} value={option}>{option}</option>)}
+        {field.type === "people" ? people.data?.map(person => <option key={person.id} value={person.id}>{person.name}</option>) : options.map(option => <option key={option} value={option}>{field.optionLabels?.[option] ?? option}</option>)}
       </select>;
     }
-    if (field.type === "multiselect" || field.type === "enumlist") return <select id={`request-${field.id}`} className="input-control min-h-24" data-testid={dataTestId} disabled={disabled} multiple value={Array.isArray(value) ? value as string[] : []} onChange={event => onChange(Array.from(event.target.selectedOptions, option => option.value))}>{options.map(option => <option key={option} value={option}>{option}</option>)}</select>;
-    if (field.type === "radio") return <div className="space-y-2">{options.map(option => <label key={option} className="flex items-center gap-2 text-sm"><input data-testid={`${dataTestId}-${option}`} type="radio" name={field.id} disabled={disabled} checked={value === option} onChange={() => onChange(option)} />{option}</label>)}</div>;
+    if (field.type === "multiselect" || field.type === "enumlist") return <select id={`request-${field.id}`} className="input-control min-h-24" data-testid={dataTestId} disabled={disabled} multiple value={Array.isArray(value) ? value as string[] : []} onChange={event => onChange(Array.from(event.target.selectedOptions, option => option.value))}>{options.map(option => <option key={option} value={option}>{field.optionLabels?.[option] ?? option}</option>)}</select>;
+    if (field.type === "radio") return <div className="space-y-2">{options.map(option => <label key={option} className="flex items-center gap-2 text-sm"><input data-testid={`${dataTestId}-${option}`} type="radio" name={field.id} disabled={disabled} checked={value === option} onChange={() => onChange(option)} />{field.optionLabels?.[option] ?? option}</label>)}</div>;
     if (uploadTypes.has(field.type)) {
       const files = Array.isArray(value) ? value as UploadedWorkflowFile[] : [];
       const isImage = ["image", "thumbnail", "drawing", "signature"].includes(field.type);
@@ -323,8 +329,9 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
         })}
         {!selected && <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">{workflows.length ? "Select an active workflow to see its form." : "There are no active workflows yet."}</p>}
         {uploadError && <p className="form-error" data-testid="status-upload-error">{uploadError}</p>}
-        {create.isError && <p className="form-error" data-testid="status-request-error">Could not submit this request. Please check the fields and try again.</p>}
-        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-quiet" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary" data-testid="button-submit-request" disabled={!selected || create.isPending || Boolean(uploadingField)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
+        {detail.isError && <p className="form-error" role="alert">The latest form choices could not be loaded. <button type="button" onClick={() => void detail.refetch()}>Retry</button></p>}
+        {create.isError && <p className="form-error" role="alert" data-testid="status-request-error">{failureMessage}</p>}
+        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-quiet" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary" data-testid="button-submit-request" disabled={!selected || detail.isLoading || detail.isError || create.isPending || Boolean(uploadingField)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
       </form>
     </section>
   </div>;

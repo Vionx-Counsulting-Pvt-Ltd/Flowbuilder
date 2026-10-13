@@ -17,6 +17,131 @@ tags:
   - name: storage
   - name: platform
 paths:
+  /reference-tables:
+    get:
+      operationId: listReferenceTables
+      tags: [workspace]
+      summary: List reusable tables in the current workspace
+      responses:
+        "200":
+          description: Tables
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReferenceTable" }
+    post:
+      operationId: createReferenceTable
+      tags: [workspace]
+      summary: Create a custom-column table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReferenceTableInput" }
+      responses:
+        "201":
+          description: Created table
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferenceTableDetail" }
+  /reference-tables/{tableId}:
+    parameters:
+      - name: tableId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getReferenceTable
+      tags: [workspace]
+      summary: Read table columns and rows
+      responses:
+        "200":
+          description: Table details
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferenceTableDetail" }
+    patch:
+      operationId: updateReferenceTable
+      tags: [workspace]
+      summary: Update table structure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReferenceTableInput" }
+      responses:
+        "200":
+          description: Updated table
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferenceTableDetail" }
+    delete:
+      operationId: deleteReferenceTable
+      tags: [workspace]
+      summary: Delete an unlinked table
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferenceDeleteResult" }
+  /reference-tables/{tableId}/rows:
+    parameters:
+      - name: tableId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: addReferenceRows
+      tags: [workspace]
+      summary: Append rows atomically, including bulk imports
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReferenceRowsInput" }
+      responses:
+        "201":
+          description: Updated table
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferenceTableDetail" }
+  /reference-tables/{tableId}/rows/{rowId}:
+    parameters:
+      - name: tableId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: rowId
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: updateReferenceRow
+      tags: [workspace]
+      summary: Edit a row or change its availability in forms
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReferenceRowInput" }
+      responses:
+        "200":
+          description: Updated table
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferenceTableDetail" }
+    delete:
+      operationId: deleteReferenceRow
+      tags: [workspace]
+      summary: Delete one row
+      responses:
+        "200":
+          description: Updated table
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferenceTableDetail" }
   /healthz:
     get:
       operationId: healthCheck
@@ -461,6 +586,83 @@ paths:
         "403": { description: Platform administrator access required }
 components:
   schemas:
+    ReferenceColumn:
+      type: object
+      required: [key, label, type, required]
+      properties:
+        key: { type: string, minLength: 1, maxLength: 50, pattern: "^[a-zA-Z][a-zA-Z0-9_]*$" }
+        label: { type: string, minLength: 1, maxLength: 100 }
+        type: { type: string, enum: [text, number, date, boolean] }
+        required: { type: boolean }
+    ReferenceValues:
+      type: object
+      additionalProperties:
+        oneOf:
+          - { type: string }
+          - { type: number }
+          - { type: boolean }
+          - { type: "null" }
+    ReferenceTableInput:
+      type: object
+      required: [name, description, columns]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 100 }
+        description: { type: string, maxLength: 1000 }
+        columns:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: "#/components/schemas/ReferenceColumn" }
+    ReferenceTable:
+      type: object
+      required: [id, name, description, columns, rowCount, activeRowCount, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/ReferenceColumn" }
+        rowCount: { type: integer }
+        activeRowCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ReferenceTableDetail:
+      allOf:
+        - $ref: "#/components/schemas/ReferenceTable"
+        - type: object
+          required: [rows]
+          properties:
+            rows:
+              type: array
+              items: { $ref: "#/components/schemas/ReferenceRow" }
+    ReferenceRow:
+      type: object
+      required: [id, values, active]
+      properties:
+        id: { type: string }
+        values: { $ref: "#/components/schemas/ReferenceValues" }
+        active: { type: boolean }
+    ReferenceRowInput:
+      type: object
+      required: [values]
+      properties:
+        values: { $ref: "#/components/schemas/ReferenceValues" }
+        active: { type: boolean, default: true }
+    ReferenceRowsInput:
+      type: object
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { $ref: "#/components/schemas/ReferenceRowInput" }
+    ReferenceDeleteResult:
+      type: object
+      required: [deleted]
+      properties:
+        deleted: { type: boolean }
     HealthStatus:
       type: object
       required: [status]
@@ -488,6 +690,11 @@ components:
         options:
           type: array
           items: { type: string }
+        sourceTableId: { type: ["string", "null"] }
+        sourceLabelColumn: { type: ["string", "null"] }
+        optionLabels:
+          type: object
+          additionalProperties: { type: string }
         key: { type: ["string", "null"] }
         helpText: { type: ["string", "null"] }
         readOnly: { type: boolean }

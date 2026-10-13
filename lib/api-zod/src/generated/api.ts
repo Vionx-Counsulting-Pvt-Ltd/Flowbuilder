@@ -9,6 +9,344 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary List reusable tables in the current workspace
+ */
+export const listReferenceTablesResponseColumnsItemKeyMax = 50;
+
+
+export const listReferenceTablesResponseColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const listReferenceTablesResponseColumnsItemLabelMax = 100;
+
+
+
+export const ListReferenceTablesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(listReferenceTablesResponseColumnsItemKeyMax).regex(listReferenceTablesResponseColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(listReferenceTablesResponseColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})),
+  "rowCount": zod.number().int(),
+  "activeRowCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListReferenceTablesResponse = zod.array(ListReferenceTablesResponseItem)
+
+
+/**
+ * @summary Create a custom-column table
+ */
+export const createReferenceTableBodyNameMin = 2;
+export const createReferenceTableBodyNameMax = 100;
+
+export const createReferenceTableBodyDescriptionMax = 1000;
+
+export const createReferenceTableBodyColumnsItemKeyMax = 50;
+
+
+export const createReferenceTableBodyColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const createReferenceTableBodyColumnsItemLabelMax = 100;
+
+export const createReferenceTableBodyColumnsMax = 20;
+
+
+
+export const CreateReferenceTableBody = zod.object({
+  "name": zod.string().min(createReferenceTableBodyNameMin).max(createReferenceTableBodyNameMax),
+  "description": zod.string().max(createReferenceTableBodyDescriptionMax),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(createReferenceTableBodyColumnsItemKeyMax).regex(createReferenceTableBodyColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(createReferenceTableBodyColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})).min(1).max(createReferenceTableBodyColumnsMax)
+})
+
+export const createReferenceTableResponseOneColumnsItemKeyMax = 50;
+
+
+export const createReferenceTableResponseOneColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const createReferenceTableResponseOneColumnsItemLabelMax = 100;
+
+
+
+export const CreateReferenceTableResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(createReferenceTableResponseOneColumnsItemKeyMax).regex(createReferenceTableResponseOneColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(createReferenceTableResponseOneColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})),
+  "rowCount": zod.number().int(),
+  "activeRowCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.string(),
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean()
+}))
+}))
+
+
+/**
+ * @summary Read table columns and rows
+ */
+export const GetReferenceTableParams = zod.object({
+  "tableId": zod.coerce.string()
+})
+
+export const getReferenceTableResponseOneColumnsItemKeyMax = 50;
+
+
+export const getReferenceTableResponseOneColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const getReferenceTableResponseOneColumnsItemLabelMax = 100;
+
+
+
+export const GetReferenceTableResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(getReferenceTableResponseOneColumnsItemKeyMax).regex(getReferenceTableResponseOneColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(getReferenceTableResponseOneColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})),
+  "rowCount": zod.number().int(),
+  "activeRowCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.string(),
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean()
+}))
+}))
+
+
+/**
+ * @summary Update table structure
+ */
+export const UpdateReferenceTableParams = zod.object({
+  "tableId": zod.coerce.string()
+})
+
+export const updateReferenceTableBodyNameMin = 2;
+export const updateReferenceTableBodyNameMax = 100;
+
+export const updateReferenceTableBodyDescriptionMax = 1000;
+
+export const updateReferenceTableBodyColumnsItemKeyMax = 50;
+
+
+export const updateReferenceTableBodyColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const updateReferenceTableBodyColumnsItemLabelMax = 100;
+
+export const updateReferenceTableBodyColumnsMax = 20;
+
+
+
+export const UpdateReferenceTableBody = zod.object({
+  "name": zod.string().min(updateReferenceTableBodyNameMin).max(updateReferenceTableBodyNameMax),
+  "description": zod.string().max(updateReferenceTableBodyDescriptionMax),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(updateReferenceTableBodyColumnsItemKeyMax).regex(updateReferenceTableBodyColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(updateReferenceTableBodyColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})).min(1).max(updateReferenceTableBodyColumnsMax)
+})
+
+export const updateReferenceTableResponseOneColumnsItemKeyMax = 50;
+
+
+export const updateReferenceTableResponseOneColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const updateReferenceTableResponseOneColumnsItemLabelMax = 100;
+
+
+
+export const UpdateReferenceTableResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(updateReferenceTableResponseOneColumnsItemKeyMax).regex(updateReferenceTableResponseOneColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(updateReferenceTableResponseOneColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})),
+  "rowCount": zod.number().int(),
+  "activeRowCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.string(),
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean()
+}))
+}))
+
+
+/**
+ * @summary Delete an unlinked table
+ */
+export const DeleteReferenceTableParams = zod.object({
+  "tableId": zod.coerce.string()
+})
+
+export const DeleteReferenceTableResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
+ * @summary Append rows atomically, including bulk imports
+ */
+export const AddReferenceRowsParams = zod.object({
+  "tableId": zod.coerce.string()
+})
+
+export const addReferenceRowsBodyRowsItemActiveDefault = true;
+export const addReferenceRowsBodyRowsMax = 5000;
+
+
+
+export const AddReferenceRowsBody = zod.object({
+  "rows": zod.array(zod.object({
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean().default(addReferenceRowsBodyRowsItemActiveDefault)
+})).min(1).max(addReferenceRowsBodyRowsMax)
+})
+
+export const addReferenceRowsResponseOneColumnsItemKeyMax = 50;
+
+
+export const addReferenceRowsResponseOneColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const addReferenceRowsResponseOneColumnsItemLabelMax = 100;
+
+
+
+export const AddReferenceRowsResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(addReferenceRowsResponseOneColumnsItemKeyMax).regex(addReferenceRowsResponseOneColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(addReferenceRowsResponseOneColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})),
+  "rowCount": zod.number().int(),
+  "activeRowCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.string(),
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean()
+}))
+}))
+
+
+/**
+ * @summary Edit a row or change its availability in forms
+ */
+export const UpdateReferenceRowParams = zod.object({
+  "tableId": zod.coerce.string(),
+  "rowId": zod.coerce.string()
+})
+
+export const updateReferenceRowBodyActiveDefault = true;
+
+export const UpdateReferenceRowBody = zod.object({
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean().default(updateReferenceRowBodyActiveDefault)
+})
+
+export const updateReferenceRowResponseOneColumnsItemKeyMax = 50;
+
+
+export const updateReferenceRowResponseOneColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const updateReferenceRowResponseOneColumnsItemLabelMax = 100;
+
+
+
+export const UpdateReferenceRowResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(updateReferenceRowResponseOneColumnsItemKeyMax).regex(updateReferenceRowResponseOneColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(updateReferenceRowResponseOneColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})),
+  "rowCount": zod.number().int(),
+  "activeRowCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.string(),
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean()
+}))
+}))
+
+
+/**
+ * @summary Delete one row
+ */
+export const DeleteReferenceRowParams = zod.object({
+  "tableId": zod.coerce.string(),
+  "rowId": zod.coerce.string()
+})
+
+export const deleteReferenceRowResponseOneColumnsItemKeyMax = 50;
+
+
+export const deleteReferenceRowResponseOneColumnsItemKeyRegExp = new RegExp('^[a-zA-Z][a-zA-Z0-9_]*$');
+export const deleteReferenceRowResponseOneColumnsItemLabelMax = 100;
+
+
+
+export const DeleteReferenceRowResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "columns": zod.array(zod.object({
+  "key": zod.string().min(1).max(deleteReferenceRowResponseOneColumnsItemKeyMax).regex(deleteReferenceRowResponseOneColumnsItemKeyRegExp),
+  "label": zod.string().min(1).max(deleteReferenceRowResponseOneColumnsItemLabelMax),
+  "type": zod.enum(['text', 'number', 'date', 'boolean']),
+  "required": zod.boolean()
+})),
+  "rowCount": zod.number().int(),
+  "activeRowCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "rows": zod.array(zod.object({
+  "id": zod.string(),
+  "values": zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()])),
+  "active": zod.boolean()
+}))
+}))
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -115,6 +453,9 @@ export const ListWorkflowsResponseItem = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -194,6 +535,9 @@ export const CreateWorkflowBody = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -263,6 +607,9 @@ export const CreateWorkflowResponse = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -345,6 +692,9 @@ export const GetWorkflowResponse = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -428,6 +778,9 @@ export const UpdateWorkflowBody = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -497,6 +850,9 @@ export const UpdateWorkflowResponse = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -614,6 +970,9 @@ export const CreateRequestResponse = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -706,6 +1065,9 @@ export const GetRequestResponse = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),
@@ -803,6 +1165,9 @@ export const ActOnRequestResponse = zod.object({
   "required": zod.boolean(),
   "placeholder": zod.string().nullish(),
   "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
   "key": zod.string().nullish(),
   "helpText": zod.string().nullish(),
   "readOnly": zod.boolean().optional(),

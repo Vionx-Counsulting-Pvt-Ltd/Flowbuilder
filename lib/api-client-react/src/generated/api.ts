@@ -29,6 +29,12 @@ import type {
   PlatformTenant,
   PlatformTenantInput,
   PlatformTenantUpdate,
+  ReferenceDeleteResult,
+  ReferenceRowInput,
+  ReferenceRowsInput,
+  ReferenceTable,
+  ReferenceTableDetail,
+  ReferenceTableInput,
   ReportOverview,
   RequestActionInput,
   RequestDetail,
@@ -73,6 +79,667 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListReferenceTablesUrl = () => {
+
+
+
+
+  return `/api/reference-tables`
+}
+
+/**
+ * @summary List reusable tables in the current workspace
+ */
+export const listReferenceTables = async ( options?: Parameters<typeof customFetch>[1]): Promise<ReferenceTable[]> => {
+
+  return customFetch<ReferenceTable[]>(getListReferenceTablesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListReferenceTablesQueryKey = () => {
+    return [
+    `/api/reference-tables`
+    ] as const;
+    }
+
+
+export const getListReferenceTablesQueryOptions = <TData = Awaited<ReturnType<typeof listReferenceTables>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReferenceTables>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListReferenceTablesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listReferenceTables>>> = ({ signal }) => listReferenceTables({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listReferenceTables>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListReferenceTablesQueryResult = NonNullable<Awaited<ReturnType<typeof listReferenceTables>>>
+export type ListReferenceTablesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List reusable tables in the current workspace
+ */
+
+export function useListReferenceTables<TData = Awaited<ReturnType<typeof listReferenceTables>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReferenceTables>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListReferenceTablesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateReferenceTableUrl = () => {
+
+
+
+
+  return `/api/reference-tables`
+}
+
+/**
+ * @summary Create a custom-column table
+ */
+export const createReferenceTable = async (referenceTableInput: ReferenceTableInput, options?: Parameters<typeof customFetch>[1]): Promise<ReferenceTableDetail> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReferenceTableDetail>(getCreateReferenceTableUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(referenceTableInput)
+  }
+);}
+
+
+
+
+
+export const getCreateReferenceTableMutationKey = () => ['createReferenceTable'] as const;
+
+export const getCreateReferenceTableMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createReferenceTable>>, TError,CreateReferenceTableMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createReferenceTable>>, TError,CreateReferenceTableMutationVariables, TContext> => {
+
+const mutationKey = getCreateReferenceTableMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createReferenceTable>>, CreateReferenceTableMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createReferenceTable(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateReferenceTableMutationResult = NonNullable<Awaited<ReturnType<typeof createReferenceTable>>>
+    export type CreateReferenceTableMutationBody = BodyType<ReferenceTableInput>
+    export type CreateReferenceTableMutationError = ErrorType<unknown>
+    export type CreateReferenceTableMutationVariables = {data: BodyType<ReferenceTableInput>}
+
+    /**
+ * @summary Create a custom-column table
+ */
+export const useCreateReferenceTable = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createReferenceTable>>, TError,CreateReferenceTableMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createReferenceTable>>,
+        TError,
+        CreateReferenceTableMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateReferenceTableMutationOptions(options));
+    }
+
+export const getGetReferenceTableUrl = (tableId: string,) => {
+
+
+
+
+  return `/api/reference-tables/${tableId}`
+}
+
+/**
+ * @summary Read table columns and rows
+ */
+export const getReferenceTable = async (tableId: string, options?: Parameters<typeof customFetch>[1]): Promise<ReferenceTableDetail> => {
+
+  return customFetch<ReferenceTableDetail>(getGetReferenceTableUrl(tableId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReferenceTableQueryKey = (tableId: string,) => {
+    return [
+    `/api/reference-tables/${tableId}`
+    ] as const;
+    }
+
+
+export const getGetReferenceTableQueryOptions = <TData = Awaited<ReturnType<typeof getReferenceTable>>, TError = ErrorType<unknown>>(tableId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReferenceTable>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReferenceTableQueryKey(tableId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReferenceTable>>> = ({ signal }) => getReferenceTable(tableId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: tableId !== null && tableId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReferenceTable>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReferenceTableQueryResult = NonNullable<Awaited<ReturnType<typeof getReferenceTable>>>
+export type GetReferenceTableQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read table columns and rows
+ */
+
+export function useGetReferenceTable<TData = Awaited<ReturnType<typeof getReferenceTable>>, TError = ErrorType<unknown>>(
+ tableId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReferenceTable>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReferenceTableQueryOptions(tableId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateReferenceTableUrl = (tableId: string,) => {
+
+
+
+
+  return `/api/reference-tables/${tableId}`
+}
+
+/**
+ * @summary Update table structure
+ */
+export const updateReferenceTable = async (tableId: string,
+    referenceTableInput: ReferenceTableInput, options?: Parameters<typeof customFetch>[1]): Promise<ReferenceTableDetail> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReferenceTableDetail>(getUpdateReferenceTableUrl(tableId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(referenceTableInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateReferenceTableMutationKey = () => ['updateReferenceTable'] as const;
+
+export const getUpdateReferenceTableMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateReferenceTable>>, TError,UpdateReferenceTableMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateReferenceTable>>, TError,UpdateReferenceTableMutationVariables, TContext> => {
+
+const mutationKey = getUpdateReferenceTableMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateReferenceTable>>, UpdateReferenceTableMutationVariables> = (props) => {
+          const {tableId,data} = props ?? {};
+
+          return  updateReferenceTable(tableId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateReferenceTableMutationResult = NonNullable<Awaited<ReturnType<typeof updateReferenceTable>>>
+    export type UpdateReferenceTableMutationBody = BodyType<ReferenceTableInput>
+    export type UpdateReferenceTableMutationError = ErrorType<unknown>
+    export type UpdateReferenceTableMutationVariables = {tableId: string;data: BodyType<ReferenceTableInput>}
+
+    /**
+ * @summary Update table structure
+ */
+export const useUpdateReferenceTable = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateReferenceTable>>, TError,UpdateReferenceTableMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateReferenceTable>>,
+        TError,
+        UpdateReferenceTableMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateReferenceTableMutationOptions(options));
+    }
+
+export const getDeleteReferenceTableUrl = (tableId: string,) => {
+
+
+
+
+  return `/api/reference-tables/${tableId}`
+}
+
+/**
+ * @summary Delete an unlinked table
+ */
+export const deleteReferenceTable = async (tableId: string, options?: Parameters<typeof customFetch>[1]): Promise<ReferenceDeleteResult> => {
+
+  return customFetch<ReferenceDeleteResult>(getDeleteReferenceTableUrl(tableId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteReferenceTableMutationKey = () => ['deleteReferenceTable'] as const;
+
+export const getDeleteReferenceTableMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteReferenceTable>>, TError,DeleteReferenceTableMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteReferenceTable>>, TError,DeleteReferenceTableMutationVariables, TContext> => {
+
+const mutationKey = getDeleteReferenceTableMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteReferenceTable>>, DeleteReferenceTableMutationVariables> = (props) => {
+          const {tableId} = props ?? {};
+
+          return  deleteReferenceTable(tableId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteReferenceTableMutationResult = NonNullable<Awaited<ReturnType<typeof deleteReferenceTable>>>
+
+    export type DeleteReferenceTableMutationError = ErrorType<unknown>
+    export type DeleteReferenceTableMutationVariables = {tableId: string}
+
+    /**
+ * @summary Delete an unlinked table
+ */
+export const useDeleteReferenceTable = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteReferenceTable>>, TError,DeleteReferenceTableMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteReferenceTable>>,
+        TError,
+        DeleteReferenceTableMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteReferenceTableMutationOptions(options));
+    }
+
+export const getAddReferenceRowsUrl = (tableId: string,) => {
+
+
+
+
+  return `/api/reference-tables/${tableId}/rows`
+}
+
+/**
+ * @summary Append rows atomically, including bulk imports
+ */
+export const addReferenceRows = async (tableId: string,
+    referenceRowsInput: ReferenceRowsInput, options?: Parameters<typeof customFetch>[1]): Promise<ReferenceTableDetail> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReferenceTableDetail>(getAddReferenceRowsUrl(tableId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(referenceRowsInput)
+  }
+);}
+
+
+
+
+
+export const getAddReferenceRowsMutationKey = () => ['addReferenceRows'] as const;
+
+export const getAddReferenceRowsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addReferenceRows>>, TError,AddReferenceRowsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addReferenceRows>>, TError,AddReferenceRowsMutationVariables, TContext> => {
+
+const mutationKey = getAddReferenceRowsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addReferenceRows>>, AddReferenceRowsMutationVariables> = (props) => {
+          const {tableId,data} = props ?? {};
+
+          return  addReferenceRows(tableId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddReferenceRowsMutationResult = NonNullable<Awaited<ReturnType<typeof addReferenceRows>>>
+    export type AddReferenceRowsMutationBody = BodyType<ReferenceRowsInput>
+    export type AddReferenceRowsMutationError = ErrorType<unknown>
+    export type AddReferenceRowsMutationVariables = {tableId: string;data: BodyType<ReferenceRowsInput>}
+
+    /**
+ * @summary Append rows atomically, including bulk imports
+ */
+export const useAddReferenceRows = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addReferenceRows>>, TError,AddReferenceRowsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addReferenceRows>>,
+        TError,
+        AddReferenceRowsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAddReferenceRowsMutationOptions(options));
+    }
+
+export const getUpdateReferenceRowUrl = (tableId: string,
+    rowId: string,) => {
+
+
+
+
+  return `/api/reference-tables/${tableId}/rows/${rowId}`
+}
+
+/**
+ * @summary Edit a row or change its availability in forms
+ */
+export const updateReferenceRow = async (tableId: string,
+    rowId: string,
+    referenceRowInput: ReferenceRowInput, options?: Parameters<typeof customFetch>[1]): Promise<ReferenceTableDetail> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReferenceTableDetail>(getUpdateReferenceRowUrl(tableId,rowId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(referenceRowInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateReferenceRowMutationKey = () => ['updateReferenceRow'] as const;
+
+export const getUpdateReferenceRowMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateReferenceRow>>, TError,UpdateReferenceRowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateReferenceRow>>, TError,UpdateReferenceRowMutationVariables, TContext> => {
+
+const mutationKey = getUpdateReferenceRowMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateReferenceRow>>, UpdateReferenceRowMutationVariables> = (props) => {
+          const {tableId,rowId,data} = props ?? {};
+
+          return  updateReferenceRow(tableId,rowId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateReferenceRowMutationResult = NonNullable<Awaited<ReturnType<typeof updateReferenceRow>>>
+    export type UpdateReferenceRowMutationBody = BodyType<ReferenceRowInput>
+    export type UpdateReferenceRowMutationError = ErrorType<unknown>
+    export type UpdateReferenceRowMutationVariables = {tableId: string;rowId: string;data: BodyType<ReferenceRowInput>}
+
+    /**
+ * @summary Edit a row or change its availability in forms
+ */
+export const useUpdateReferenceRow = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateReferenceRow>>, TError,UpdateReferenceRowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateReferenceRow>>,
+        TError,
+        UpdateReferenceRowMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateReferenceRowMutationOptions(options));
+    }
+
+export const getDeleteReferenceRowUrl = (tableId: string,
+    rowId: string,) => {
+
+
+
+
+  return `/api/reference-tables/${tableId}/rows/${rowId}`
+}
+
+/**
+ * @summary Delete one row
+ */
+export const deleteReferenceRow = async (tableId: string,
+    rowId: string, options?: Parameters<typeof customFetch>[1]): Promise<ReferenceTableDetail> => {
+
+  return customFetch<ReferenceTableDetail>(getDeleteReferenceRowUrl(tableId,rowId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteReferenceRowMutationKey = () => ['deleteReferenceRow'] as const;
+
+export const getDeleteReferenceRowMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteReferenceRow>>, TError,DeleteReferenceRowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteReferenceRow>>, TError,DeleteReferenceRowMutationVariables, TContext> => {
+
+const mutationKey = getDeleteReferenceRowMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteReferenceRow>>, DeleteReferenceRowMutationVariables> = (props) => {
+          const {tableId,rowId} = props ?? {};
+
+          return  deleteReferenceRow(tableId,rowId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteReferenceRowMutationResult = NonNullable<Awaited<ReturnType<typeof deleteReferenceRow>>>
+
+    export type DeleteReferenceRowMutationError = ErrorType<unknown>
+    export type DeleteReferenceRowMutationVariables = {tableId: string;rowId: string}
+
+    /**
+ * @summary Delete one row
+ */
+export const useDeleteReferenceRow = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteReferenceRow>>, TError,DeleteReferenceRowMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteReferenceRow>>,
+        TError,
+        DeleteReferenceRowMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteReferenceRowMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

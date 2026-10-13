@@ -78,6 +78,7 @@ import {
   type MemberContext,
 } from "../lib/flowbuilder-auth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { hydrateReferenceFields, ReferenceDataError, storedReferenceFields } from "../lib/reference-data";
 import type {
   WorkflowField,
   WorkflowStage,
@@ -895,6 +896,7 @@ async function workflowResponse(
   ]);
   return {
     ...workflow,
+    fields: await hydrateReferenceFields(workflow.tenantId, workflow.fields),
     ownerName: owner?.name ?? "Workspace member",
     requestCount: requestCount?.value ?? 0,
   };
@@ -1136,8 +1138,9 @@ router.post("/workflows", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const resolvedFields = await hydrateReferenceFields(member.tenantId, parsed.data.fields as WorkflowField[], true);
   const definitionError = workflowDefinitionError(
-    parsed.data.fields as WorkflowField[],
+    resolvedFields,
     parsed.data.stages as WorkflowStage[],
   );
   if (definitionError) {
@@ -1154,7 +1157,7 @@ router.post("/workflows", async (req, res): Promise<void> => {
       category: parsed.data.category,
       description: parsed.data.description,
       routing: parsed.data.routing,
-      fields: parsed.data.fields as WorkflowField[],
+      fields: storedReferenceFields(parsed.data.fields as WorkflowField[]),
       stages: parsed.data.stages as WorkflowStage[],
       status: "draft",
       version: 1,
@@ -1233,7 +1236,7 @@ router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
     parsed.data.status === "active"
   ) {
     const definitionError = workflowDefinitionError(
-      (parsed.data.fields as WorkflowField[] | undefined) ?? existing.fields,
+      await hydrateReferenceFields(member.tenantId, (parsed.data.fields as WorkflowField[] | undefined) ?? existing.fields, true),
       (parsed.data.stages as WorkflowStage[] | undefined) ?? existing.stages,
       (parsed.data.status ?? existing.status) === "active",
     );
@@ -1247,7 +1250,7 @@ router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
     .set({
       ...parsed.data,
       fields: parsed.data.fields
-        ? (parsed.data.fields as WorkflowField[])
+        ? storedReferenceFields(parsed.data.fields as WorkflowField[])
         : existing.fields,
       stages: parsed.data.stages
         ? (parsed.data.stages as WorkflowStage[])
@@ -1314,6 +1317,7 @@ router.post("/requests", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Active workflow not found." });
     return;
   }
+  workflow.fields = await hydrateReferenceFields(member.tenantId, workflow.fields, true);
   const [tenant] = await db
     .select({ requestLimit: tenantsTable.requestLimit })
     .from(tenantsTable)
@@ -2471,4 +2475,8 @@ router.patch("/platform/tenants/:tenantId", async (req, res): Promise<void> => {
   res.json(UpdatePlatformTenantResponse.parse(await platformTenantResponse(updated)));
 });
 
+router.use((error: unknown, _req: import("express").Request, res: Response, next: import("express").NextFunction) => {
+  if (error instanceof ReferenceDataError) { res.status(error.status).json({ error: error.message }); return; }
+  next(error);
+});
 export default router;

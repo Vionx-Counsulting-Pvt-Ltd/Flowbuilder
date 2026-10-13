@@ -2,3 +2,4 @@
 - [Signed-in UI verification](signed-in-ui-verification.md) — public screenshots cannot confirm editor fixes; verify the affected component's rendered output.
 - [Draft validation policy](draft-validation-policy.md) — allow unfinished drafts, but never relax publication checks when editing live forms.
 - [Reference data requirements](reference-data-requirements.md) — maintained tables must supply form choices, including onboarding branches.
+- [Spreadsheet imports](spreadsheet-import-compatibility.md) — distinguish workbook results from worksheet grids; verify the installed reader API.

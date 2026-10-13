@@ -24,6 +24,7 @@ import type {
 } from '@workspace/api-client-react';
 import WorkflowEditor from './WorkflowEditor';
 import RequestFormModal from './components/RequestFormModal';
+import TablesPage from './pages/TablesPage';
 import BulkUserImport from './BulkUserImport';
 import PlatformAdminPage from './PlatformAdminPage';
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -144,6 +145,7 @@ const nav = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/workflows', label: 'Workflows', icon: WorkflowIcon },
   { href: '/requests', label: 'Requests', icon: ListChecks },
+  { href: '/tables', label: 'Tables', icon: ListChecks },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/reports', label: 'Reports', icon: Activity },
   { href: '/platform', label: 'Platform tenants', icon: Building2 },
@@ -177,6 +179,7 @@ function AppFrame() {
   const unread = useListNotifications();
   const notificationCount = unread.data?.filter(item => !item.read).length || 0;
   const visibleNav = nav.filter(item => {
+    if (item.href === '/tables') return Boolean(current.data?.permissions.includes('build') || current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner');
     if (item.href === '/team') return current.data?.permissions.includes('admin') ?? false;
     if (item.href === '/reports') return Boolean(current.data?.permissions.includes('report') || current.data?.permissions.includes('admin'));
     if (item.href === '/platform') return current.data?.isPlatformAdmin ?? false;
@@ -203,6 +206,7 @@ function AppFrame() {
       <div className="page-content"><Switch>
         <Route path="/dashboard" component={DashboardPage} />
         <Route path="/workflows/new" component={WorkflowEditor} />
+        <Route path="/tables" component={TablesPage} />
         <Route path="/workflows/:workflowId/edit" component={WorkflowEditor} />
         <Route path="/workflows" component={WorkflowsPage} />
         <Route path="/requests" component={RequestsPage} />
@@ -404,6 +408,10 @@ function SubmittedFieldValue({ field, value, people }: { field: WorkflowField; v
     return names.length ? names.join(', ') : '—';
   }
   if (field.type === 'checkbox') return value === true ? 'Yes' : value === false ? 'No' : '—';
+  if (field.sourceTableId) {
+    const ids = Array.isArray(value) ? value : value == null || value === '' ? [] : [value];
+    return ids.length ? ids.map(id => field.optionLabels?.[String(id)] ?? String(id)).join(', ') : '—';
+  }
   if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
   return value === undefined || value === null || value === '' ? '—' : String(value);
 }
