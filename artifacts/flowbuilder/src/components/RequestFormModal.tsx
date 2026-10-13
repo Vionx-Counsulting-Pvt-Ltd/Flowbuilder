@@ -152,7 +152,8 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
   const selected = detail.data ?? workflows.find(workflow => workflow.id === workflowId);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [uploadError, setUploadError] = useState("");
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  const uploadInProgress = useRef(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [locatingField, setLocatingField] = useState<string | null>(null);
   const computedValues = useMemo(() => {
@@ -164,7 +165,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
     if (current.isLoading) return;
     setValues(initialValues(selected?.fields ?? [], expressionUser));
     setErrors({});
-    setUploadError("");
+    setUploadErrors({});
   }, [workflowId, selected?.id, expressionUser, current.isLoading]);
 
   function updateValue(id: string, value: unknown) {
@@ -173,34 +174,35 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
   }
 
   async function uploadFiles(field: WorkflowField, fileList: FileList | File[] | null) {
-    if (!fileList?.length) return;
+    if (!fileList?.length || uploadInProgress.current) return;
     const existing = Array.isArray(values[field.id]) ? values[field.id] as UploadedWorkflowFile[] : [];
     const maxFiles = field.multiple ? field.maxFiles ?? 10 : 1;
     const selectedFiles = Array.from(fileList);
     if (existing.length + selectedFiles.length > maxFiles) {
-      setUploadError(`Choose up to ${maxFiles} file${maxFiles === 1 ? "" : "s"} for ${field.label}.`);
+      setUploadErrors(current => ({ ...current, [field.id]: `No files were added. Choose up to ${maxFiles} file${maxFiles === 1 ? "" : "s"} for ${field.label}.` }));
       return;
     }
     const maxSizeMB = field.maxFileSizeMB ?? 20;
     const oversized = selectedFiles.find(file => file.size > maxSizeMB * 1024 * 1024);
-    if (oversized) { setUploadError(`${oversized.name} exceeds the ${maxSizeMB} MB limit.`); return; }
+    if (oversized) { setUploadErrors(current => ({ ...current, [field.id]: `No files were added. ${oversized.name} exceeds the ${maxSizeMB} MB limit. Choose smaller files or clear this failed selection.` })); return; }
+    uploadInProgress.current = true;
     setUploadingField(field.id);
-    setUploadError("");
+    setUploadErrors(current => ({ ...current, [field.id]: "" }));
     try {
-      const completed: UploadedWorkflowFile[] = [];
       for (const file of selectedFiles) {
         const response = await upload.mutateAsync({ data: { name: file.name, size: file.size, contentType: file.type || "application/octet-stream" } });
         const result = await fetch(response.uploadURL, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
         if (!result.ok) throw new Error(`Upload failed for ${file.name}.`);
-        completed.push({ fileId: response.fileId, name: response.metadata.name, contentType: response.metadata.contentType, size: response.metadata.size });
+        const completed = { fileId: response.fileId, name: response.metadata.name, contentType: response.metadata.contentType, size: response.metadata.size };
+        // Commit each successful upload so a later failure cannot discard it.
+        setValues(current => {
+          const currentFiles = Array.isArray(current[field.id]) ? current[field.id] as UploadedWorkflowFile[] : [];
+          return { ...current, [field.id]: field.multiple ? [...currentFiles, completed] : [completed] };
+        });
       }
-      setValues(current => {
-        const currentFiles = Array.isArray(current[field.id]) ? current[field.id] as UploadedWorkflowFile[] : [];
-        return { ...current, [field.id]: field.multiple ? [...currentFiles, ...completed] : completed };
-      });
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "The upload failed.");
-    } finally { setUploadingField(null); }
+      setUploadErrors(current => ({ ...current, [field.id]: `${error instanceof Error ? error.message : "The upload failed."} Successfully uploaded files are kept below. Choose the missing files again or clear this failed selection.` }));
+    } finally { uploadInProgress.current = false; setUploadingField(null); }
   }
 
   function requestLocation(field: WorkflowField) {
@@ -218,7 +220,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selected || detail.isError || detail.isLoading) return;
+    if (!selected || detail.isError || detail.isLoading || uploadInProgress.current || Object.values(uploadErrors).some(Boolean)) return;
     const fields = selected.fields;
     const nextErrors: Record<string, string> = {};
     for (const field of fields) {
@@ -290,11 +292,11 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
       const isImage = ["image", "thumbnail", "drawing", "signature"].includes(field.type);
       const accept = field.accept || (isImage ? "image/*" : undefined);
       return <div className="space-y-2">
-        {(field.type === "drawing" || field.type === "signature") && <DrawingCapture fieldType={field.type} disabled={disabled || uploadingField === field.id} onCapture={file => void uploadFiles(field, [file])} />}
+        {(field.type === "drawing" || field.type === "signature") && <DrawingCapture fieldType={field.type} disabled={disabled || Boolean(uploadingField) || current.isLoading || create.isPending} onCapture={file => void uploadFiles(field, [file])} />}
         <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm">
           {uploadingField === field.id ? <LoaderCircle className="animate-spin" size={16} /> : <Paperclip size={16} />}
           {uploadingField === field.id ? "Uploading…" : ["signature", "drawing"].includes(field.type) ? "Or upload an image" : "Choose file"}
-          <input className="sr-only" data-testid={dataTestId} type="file" disabled={disabled || uploadingField === field.id} multiple={Boolean(field.multiple)} accept={accept} onChange={event => {
+          <input id={`request-${field.id}`} className="sr-only" data-testid={dataTestId} type="file" disabled={disabled || Boolean(uploadingField) || current.isLoading || create.isPending} multiple={Boolean(field.multiple)} accept={accept} onChange={event => {
             // FileList is live: resetting the picker empties it, so retain the File objects first.
             const selectedFiles = Array.from(event.currentTarget.files ?? []);
             event.currentTarget.value = "";
@@ -302,7 +304,9 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
           }} />
         </label>
         <p className="text-xs text-muted-foreground">{["drawing", "signature"].includes(field.type) ? "Captured or uploaded image is stored privately in this workspace." : "Private workspace upload."} · up to {field.multiple ? field.maxFiles ?? 10 : 1} file{field.multiple ? "s" : ""} · {field.maxFileSizeMB ?? 20} MB each.</p>
-        {files.map(file => <div key={file.fileId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"><span className="truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="text-destructive" data-testid={`remove-upload-${field.id}-${file.fileId}`} onClick={() => onChange(files.filter(item => item.fileId !== file.fileId))}>Remove</button></div>)}
+        {files.map(file => <div key={file.fileId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"><span className="truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="text-destructive" disabled={Boolean(uploadingField) || create.isPending} data-testid={`remove-upload-${field.id}-${file.fileId}`} onClick={() => onChange(files.filter(item => item.fileId !== file.fileId))}>Remove</button></div>)}
+        {!files.length && !uploadingField && !uploadErrors[field.id] && <p className="text-xs text-muted-foreground">No files attached. Selected files must appear here before you submit.</p>}
+        {uploadErrors[field.id] && <div className="rounded-lg border border-destructive/30 p-3 text-sm" role="alert" data-testid={`upload-error-${field.id}`}><p className="form-error">{uploadErrors[field.id]}</p><button type="button" className="text-link mt-2" disabled={Boolean(uploadingField) || create.isPending} onClick={() => setUploadErrors(current => ({ ...current, [field.id]: "" }))}>Clear failed selection{files.length ? " (keep uploaded files)" : " (no files attached)"}</button></div>}
       </div>;
     }
     if (["location", "latlong", "xy"].includes(field.type)) return <div className="flex gap-2"><input className="input-control" data-testid={dataTestId} type="text" disabled={disabled} value={String(value ?? "")} placeholder={field.placeholder || (field.type === "xy" ? "X, Y" : "Latitude, longitude")} onChange={event => onChange(event.target.value)} />{field.type !== "xy" && <button type="button" className="button button-outline shrink-0" disabled={disabled || locatingField === field.id} onClick={() => requestLocation(field)} aria-label="Use browser location">{locatingField === field.id ? <LoaderCircle size={15} className="animate-spin" /> : <MapPin size={15} />}</button>}</div>;
@@ -318,7 +322,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
         <button type="button" className="icon-button" aria-label="Close request form" data-testid="button-close-request-form" onClick={onClose}><X size={18} /></button>
       </div>
       <form onSubmit={submit} className="max-h-[75dvh] space-y-4 overflow-y-auto px-6 py-5">
-        <label className="form-field"><span>Workflow</span><select className="input-control" data-testid="select-request-workflow" value={workflowId} onChange={event => setWorkflowId(event.target.value)} required><option value="">Choose a workflow</option>{workflows.filter(workflow => workflow.status === "active").map(workflow => <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>)}</select></label>
+        <label className="form-field"><span>Workflow</span><select className="input-control" data-testid="select-request-workflow" value={workflowId} disabled={Boolean(uploadingField) || create.isPending} onChange={event => setWorkflowId(event.target.value)} required><option value="">Choose a workflow</option>{workflows.filter(workflow => workflow.status === "active").map(workflow => <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>)}</select></label>
         {selected?.fields.filter(field => isVisible(field, selected.fields, computedValues, expressionUser)).map(field => {
           const value = computedValues[field.id];
           const required = field.required || Boolean(evaluate(field.requiredIf, selected.fields, { ...computedValues, _THIS: value }, false, expressionUser));
@@ -333,10 +337,10 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
           </div>;
         })}
         {!selected && <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">{workflows.length ? "Select an active workflow to see its form." : "There are no active workflows yet."}</p>}
-        {uploadError && <p className="form-error" data-testid="status-upload-error">{uploadError}</p>}
+        {Object.values(uploadErrors).some(Boolean) && <p className="form-error" role="alert" data-testid="status-upload-error">Resolve the file upload error above before submitting, or explicitly clear the failed selection.</p>}
         {detail.isError && <p className="form-error" role="alert">The latest form choices could not be loaded. <button type="button" onClick={() => void detail.refetch()}>Retry</button></p>}
         {create.isError && <p className="form-error" role="alert" data-testid="status-request-error">{failureMessage}</p>}
-        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-outline modal-footer-btn" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary modal-footer-btn" data-testid="button-submit-request" disabled={!selected || detail.isLoading || detail.isError || create.isPending || Boolean(uploadingField)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
+        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-outline modal-footer-btn" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary modal-footer-btn" data-testid="button-submit-request" disabled={!selected || current.isLoading || detail.isLoading || detail.isError || create.isPending || Boolean(uploadingField) || Object.values(uploadErrors).some(Boolean)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
       </form>
     </section>
   </div>;
