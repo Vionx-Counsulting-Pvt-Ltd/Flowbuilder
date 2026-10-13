@@ -294,11 +294,11 @@ function workflowDefinitionError(
 
   if (requirePublish && stages.length === 0) return "Add at least one approval stage.";
   for (const stage of stages) {
-    if (!stage.name.trim()) return "Every approval stage needs a name.";
+    if (requirePublish && !stage.name.trim()) return "Every approval stage needs a name.";
     if (!Number.isInteger(stage.slaHours) || stage.slaHours < 1) {
       return `Set a valid SLA for “${stage.name}”.`;
     }
-    if (stage.assigneeType !== "manager" && !stage.assigneeLabel.trim()) {
+    if (requirePublish && stage.assigneeType !== "manager" && !stage.assigneeLabel.trim()) {
       return `Choose an owner for “${stage.name}”.`;
     }
     if (stage.conditionFieldId) {
@@ -1235,7 +1235,7 @@ router.patch("/workflows/:workflowId", async (req, res): Promise<void> => {
     const definitionError = workflowDefinitionError(
       (parsed.data.fields as WorkflowField[] | undefined) ?? existing.fields,
       (parsed.data.stages as WorkflowStage[] | undefined) ?? existing.stages,
-      parsed.data.status === "active",
+      (parsed.data.status ?? existing.status) === "active",
     );
     if (definitionError) {
       res.status(400).json({ error: definitionError });

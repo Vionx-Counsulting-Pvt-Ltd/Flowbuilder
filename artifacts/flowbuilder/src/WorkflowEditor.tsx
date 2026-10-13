@@ -87,6 +87,13 @@ function Label({ title, children, hint }: { title: string; children: ReactNode; 
 function toInput(field: WorkflowField): WorkflowInput['fields'][number] {
   return { ...field, options: field.options ? [...field.options] : undefined };
 }
+function saveFailureMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'data' in error) {
+    const data = error.data;
+    if (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' && data.error.trim()) return data.error;
+  }
+  return fallback;
+}
 
 export default function WorkflowEditor() {
   const params = useParams<{ workflowId?: string }>();
@@ -110,6 +117,7 @@ export default function WorkflowEditor() {
   const [testValues, setTestValues] = useState<Record<string, unknown>>({});
   const [previewErrors, setPreviewErrors] = useState<Record<string, string>>({});
   const [validated, setValidated] = useState(false);
+  const [validationIntent, setValidationIntent] = useState<'draft' | 'publish'>('publish');
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
   const [publishConfirm, setPublishConfirm] = useState(false);
@@ -155,6 +163,19 @@ export default function WorkflowEditor() {
     });
     return result;
   }, [definition]);
+  const draftIssues = useMemo(() => {
+    const result: string[] = [];
+    if (definition.name.trim().length < 2) result.push('Workflow name must be at least two characters.');
+    if (!definition.category.trim()) result.push('Choose a category.');
+    if (definition.fields.some(field => !field.label.trim())) result.push('Every field needs a label.');
+    const labels = definition.fields.map(field => field.label.trim().toLowerCase()).filter(Boolean);
+    if (new Set(labels).size !== labels.length) result.push('Field labels must be unique.');
+    definition.stages.forEach((stage, index) => {
+      if (!Number.isInteger(stage.slaHours) || stage.slaHours < 1) result.push(`Stage ${index + 1} needs an SLA of at least one hour.`);
+    });
+    return result;
+  }, [definition]);
+  const actionIssues = validationIntent === 'publish' || workflowStatus === 'active' ? issues : draftIssues;
   const previewValues = useMemo(
     () => previewValuesFor(definition.fields, testValues, previewUser),
     [definition.fields, testValues, previewUser],
@@ -213,40 +234,48 @@ export default function WorkflowEditor() {
       stages: definition.stages.map((stage, index) => ({ ...stage, name: stage.name.trim(), order: index + 1, assigneeLabel: stage.assigneeType === 'manager' ? 'Manager' : stage.assigneeLabel, ...(stage.conditionFieldId ? {} : { conditionFieldId: null, conditionValue: null }) })),
     };
   }
-  function save(event: FormEvent, intent: 'draft' | 'publish' = 'draft') {
-    event.preventDefault();
+  function save(intent: 'draft' | 'publish' = 'draft') {
+    if (busy) return;
+    setValidationIntent(intent);
     setValidated(true); setSaveError('');
-    if (issues.length) return;
+    if ((intent === 'publish' || workflowStatus === 'active' ? issues : draftIssues).length) return;
     const data = payload();
     const finish = (result: { id: string }) => {
       void qc.invalidateQueries({ queryKey: getListWorkflowsQueryKey() });
       void qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      void qc.invalidateQueries({ queryKey: getGetWorkflowQueryKey(result.id) });
       setSaved(true);
       if (!workflowId) setLocation(`/workflows/${result.id}/edit`);
     };
     if (workflowId) {
       const updateData = { ...data, status: intent === 'publish' ? 'active' as const : workflowStatus === 'active' ? 'active' as const : 'draft' as const };
-      update.mutate({ workflowId, data: updateData }, { onSuccess: finish, onError: () => setSaveError('The workflow could not be saved. Please try again.') });
+      update.mutate({ workflowId, data: updateData }, { onSuccess: finish, onError: error => setSaveError(saveFailureMessage(error, 'The workflow could not be saved. Please try again.')) });
     } else {
       create.mutate({ data }, {
         onSuccess: result => {
           if (intent === 'publish') {
             update.mutate({ workflowId: result.id, data: { ...data, status: 'active' } }, {
               onSuccess: finish,
-              onError: () => { setSaveError('The workflow was created as a draft, but could not be published. Please try again.'); setLocation(`/workflows/${result.id}/edit`); },
+              onError: error => { setSaveError(`The workflow was saved as a draft, but publishing failed: ${saveFailureMessage(error, 'Please try again.')}`); setLocation(`/workflows/${result.id}/edit`); },
             });
           } else finish(result);
         },
-        onError: () => setSaveError('The workflow could not be saved. Please try again.'),
+        onError: error => setSaveError(saveFailureMessage(error, 'The workflow could not be saved. Please try again.')),
       });
     }
     setPublishConfirm(false);
   }
-  function submitDraft(event: FormEvent) { save(event, 'draft'); }
+  function submitDraft(event: FormEvent) { event.preventDefault(); save('draft'); }
+  function requestPublish() {
+    if (busy) return;
+    setValidationIntent('publish');
+    setValidated(true);
+    setSaveError('');
+    if (!issues.length) setPublishConfirm(true);
+  }
   function submitPublish() {
-    if (issues.length) { setValidated(true); setPublishConfirm(false); return; }
-    const fakeEvent = { preventDefault() {} } as FormEvent;
-    save(fakeEvent, 'publish');
+    setPublishConfirm(false);
+    save('publish');
   }
   if (current.isLoading) return <div className="workflow-editor-loading" aria-label="Loading workspace permissions"><div /><div /><div /></div>;
   if (!canBuild) return <section className="surface workflow-editor-error" role="alert"><CircleAlert /><h1>Builder access required</h1><p>Ask a workspace administrator to grant build access. Workflow Owner access remains supported.</p><Button className="button-outline" onClick={() => setLocation('/workflows')}>Back to workflows</Button></section>;
@@ -260,10 +289,11 @@ export default function WorkflowEditor() {
       <div className="fb-actions">
         <span className={`fb-save-state ${saved ? 'is-saved' : ''}`} aria-live="polite">{saved ? <><Check size={13} /> Saved just now</> : workflowStatus === 'active' ? 'Published workflow' : 'Draft definition'}</span>
         <Button className="button-outline fb-preview-button" type="button" aria-label="Preview workflow" onClick={() => setPreviewOpen(true)} data-testid="button-preview"><Eye size={15} /><span className="fb-action-label">Preview</span></Button>
-        <Button className="button-outline fb-save-button" type="button" aria-label={busy ? 'Saving draft' : 'Save draft'} disabled={busy || issues.length > 0} onClick={e => save(e as unknown as FormEvent, 'draft')} data-testid="button-save-draft"><span className="fb-action-label">{busy ? 'Saving…' : 'Save draft'}</span></Button>
-        <Button className="button-primary fb-publish-button" type="button" aria-label={busy ? 'Publishing workflow' : workflowStatus === 'active' ? 'Save and publish workflow' : 'Publish workflow'} disabled={busy} onClick={() => { setValidated(true); if (!issues.length) setPublishConfirm(true); }} data-testid="button-publish"><span className="fb-action-label">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save & publish' : 'Publish'}</span><ArrowRight size={15} /></Button>
+        <Button className="button-outline fb-save-button" type="button" aria-label={busy ? 'Saving workflow' : workflowStatus === 'active' ? 'Save changes' : 'Save draft'} disabled={busy} onClick={() => save('draft')} data-testid="button-save-draft"><span className="fb-action-label">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save changes' : 'Save draft'}</span></Button>
+        <Button className="button-primary fb-publish-button" type="button" aria-label={busy ? 'Publishing workflow' : workflowStatus === 'active' ? 'Save and publish workflow' : 'Publish workflow'} disabled={busy} onClick={requestPublish} data-testid="button-publish"><span className="fb-action-label">{busy ? 'Saving…' : workflowStatus === 'active' ? 'Save & publish' : 'Publish'}</span><ArrowRight size={15} /></Button>
       </div>
     </header>
+    {validated && actionIssues.length > 0 && <section className="fb-action-errors" role="alert" data-testid="workflow-action-errors"><b>{validationIntent === 'publish' ? 'Before publishing, fix these details:' : 'Before saving, fix these details:'}</b><ul>{actionIssues.map(issue => <li key={issue}>{issue}</li>)}</ul></section>}
     <form id="workflow-definition" onSubmit={submitDraft}>
       <div className="fb-titlebar">
         <div className="fb-title-copy"><div className="eyebrow">FORM DESIGNER <span>·</span> {workflowStatus === 'active' ? 'LIVE WORKFLOW' : 'UNPUBLISHED'}</div><input className="fb-name-input" value={definition.name} onChange={e => { setDefinition(value => ({ ...value, name: e.target.value })); setSaved(false); }} placeholder="Untitled workflow" aria-label="Workflow name" data-testid="input-workflow-name" /><span className="fb-title-sub">Shape the request first. Route it when it’s ready.</span></div>

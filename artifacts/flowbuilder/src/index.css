@@ -200,6 +200,8 @@
 .fb-mini-check.good { color: #548267; }.fb-mini-check.good > span { background: #e9f2e8; }
 .fb-mini-check b, .fb-mini-check small { display: block; }.fb-mini-check b { font-size: 9px; }.fb-mini-check small { margin-top: 3px; color: #929d96; font-size: 8px; }
 .fb-issue-list { max-height: 100px; overflow: auto; margin: 8px 0 0; padding: 8px 0 0 12px; border-top: 1px solid #e8ebe4; color: #a36a52; font-size: 8px; line-height: 1.55; }
+.fb-action-errors { margin: 16px 24px 0; padding: 14px 18px; border: 1px solid #edcfca; border-radius: 9px; background: #fff8f6; color: #a84f43; font-size: 13px; line-height: 1.5; }
+.fb-action-errors ul { margin: 6px 0 0; padding-left: 20px; }
 .fb-toast-error { position: fixed; right: 22px; bottom: 22px; z-index: 80; display: flex; max-width: min(430px, calc(100vw - 32px)); align-items: center; gap: 9px; border: 1px solid #edcfca; border-radius: 9px; padding: 12px 14px; background: #fff8f6; box-shadow: 0 12px 35px rgba(58,47,40,.12); color: #a84f43; font-size: 11px; }
 .fb-toast-error button { display: grid; width: 24px; height: 24px; flex: none; place-items: center; margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; }
 .fb-modal-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(32,46,44,.42); backdrop-filter: blur(4px); animation: fade-in .15s ease both; }
