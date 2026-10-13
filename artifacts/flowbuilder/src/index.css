@@ -267,7 +267,7 @@
 .form-error { color: #a84640; font-size: 12px; line-height: 1.5; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(25, 37, 42, .48); backdrop-filter: blur(3px); animation: fade-in .18s ease both; }
 .modal-panel { width: 100%; max-height: calc(100dvh - 36px); overflow: hidden; border: 1px solid #e7e3d9; border-radius: 16px; background: #fffefa; box-shadow: 0 22px 70px rgba(28, 40, 43, .22); animation: rise-in .22s cubic-bezier(.2,.7,.2,1) both; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #ece9e1; padding-top: 16px; }
+.modal-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; border-top: 1px solid #ece9e1; padding-top: 16px; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .surface { overflow: hidden; }
 .eyebrow, .section-label { color: #758078; font-family: var(--app-font-mono); font-size: 9px; font-weight: 500; letter-spacing: .12em; }
@@ -953,3 +953,7 @@
 .fb-sheet-description { display: block; width: 100%; min-width: 0; height: 24px; max-height: 64px; resize: vertical; border: 0; border-bottom: 1px solid transparent; outline: 0; padding: 2px 0; background: transparent; color: #6f7d76; font: 11px/1.4 var(--app-font-sans); }
 .fb-sheet-description:hover, .fb-sheet-description:focus { border-bottom-color: #d8e0d6; }
 .fb-sheet-description::placeholder { color: #9aa29c; }
+.modal-footer-btn { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 9px 18px; font-size: 14px; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; }
+.modal-footer-btn:disabled { cursor: not-allowed; opacity: .5; }
+.modal-footer-btn:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+@media (max-width: 420px) { .modal-actions .modal-footer-btn { flex: 1 1 100%; } }
