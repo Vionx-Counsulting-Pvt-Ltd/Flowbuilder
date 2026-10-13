@@ -7,6 +7,12 @@ The product owner requested maintained tables whose values can be linked to spec
 
 They chose custom-column tables, and explicitly requested bulk uploads for any table, not only Branches.
 
+Staff onboarding must automatically fill the Region input from the selected Branch's maintained table row.
+
+**Why:** The product owner explicitly requested Branch-to-Region automation, rather than requiring users to enter the region separately.
+
+**How to apply:** Use an explicit column-to-field mapping from the chosen branch record. Changing or clearing the branch must update or clear its derived region; do not infer it from the branch's displayed name.
+
 **Why:** Shared choice data needs to be maintained centrally rather than entered repeatedly in individual form definitions.
 
 **How to apply:** Treat reusable reference data as an explicit extension of the earlier form-focused scope. This request alone does not imply full AppSheet cross-table formula compatibility or system-generated columns.
