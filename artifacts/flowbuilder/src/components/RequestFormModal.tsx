@@ -297,10 +297,11 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
       const accept = field.accept || (isImage ? "image/*" : undefined);
       return <div className="space-y-2">
         {(field.type === "drawing" || field.type === "signature") && <DrawingCapture fieldType={field.type} disabled={disabled || Boolean(uploadingField) || current.isLoading || create.isPending} onCapture={file => void uploadFiles(field, [file])} />}
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm">
+        <label className="relative flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm focus-within:ring-2 focus-within:ring-primary/30">
           {uploadingField === field.id ? <LoaderCircle className="animate-spin" size={16} /> : <Paperclip size={16} />}
           {uploadingField === field.id ? "Uploading…" : ["signature", "drawing"].includes(field.type) ? "Or upload an image" : "Choose file"}
-          <input id={`request-${field.id}`} className="sr-only" data-testid={dataTestId} type="file" disabled={disabled || Boolean(uploadingField) || current.isLoading || create.isPending} multiple={Boolean(field.multiple)} accept={accept} onChange={event => {
+          {/* Keep the focusable picker inside the visible upload area so native focus cannot scroll the form to a hidden control. */}
+          <input id={`request-${field.id}`} className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed" data-testid={dataTestId} type="file" disabled={disabled || Boolean(uploadingField) || current.isLoading || create.isPending} multiple={Boolean(field.multiple)} accept={accept} onChange={event => {
             // FileList is live: resetting the picker empties it, so retain the File objects first.
             const selectedFiles = Array.from(event.currentTarget.files ?? []);
             event.currentTarget.value = "";
