@@ -12,6 +12,8 @@ import type { WorkflowField } from './workflowField';
 import type { WorkflowStage } from './workflowStage';
 
 export type RequestDetail = RequestSummary & {
+  canEdit: boolean;
+  canApprove: boolean;
   formData: RequestDetailFormData;
   fields: WorkflowField[];
   stages: WorkflowStage[];

@@ -330,6 +330,65 @@ paths:
                 $ref: "#/components/schemas/RequestDetail"
         "404":
           description: Request not found
+  /requests/{requestId}/edit-form:
+    get:
+      operationId: getRequestEditForm
+      tags: [requests]
+      summary: Get a returned request's correction form (requester or workspace admin only)
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Correction form with existing answers
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RequestEditForm" }
+        "403":
+          description: Only returned requests can be edited by their requester or workspace admin
+        "404":
+          description: Request not found
+  /requests/{requestId}/corrections:
+    post:
+      operationId: correctRequest
+      tags: [requests]
+      summary: Correct a returned request and restart approval without changing its reference
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RequestCorrectionInput" }
+      responses:
+        "200":
+          description: Corrected and resubmitted request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RequestDetail" }
+        "400":
+          description: Invalid correction answers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
+                  fieldErrors:
+                    type: object
+                    additionalProperties: { type: string }
+        "403":
+          description: Editing is not allowed
+        "404":
+          description: Request not found
+        "409":
+          description: Request changed since the correction form was opened
   /requests/{requestId}/actions:
     post:
       operationId: actOnRequest
@@ -885,8 +944,10 @@ components:
       allOf:
         - $ref: "#/components/schemas/RequestSummary"
         - type: object
-          required: [formData, fields, stages, audit]
+          required: [formData, fields, stages, audit, canEdit, canApprove]
           properties:
+            canEdit: { type: boolean }
+            canApprove: { type: boolean }
             formData:
               type: object
               additionalProperties: true
@@ -907,6 +968,31 @@ components:
         formData:
           type: object
           additionalProperties: true
+    RequestEditForm:
+      type: object
+      required: [workflow, formData, expressionUser, updatedAt]
+      properties:
+        workflow: { $ref: "#/components/schemas/Workflow" }
+        formData:
+          type: object
+          additionalProperties: true
+        expressionUser:
+          type: object
+          required: [email, name, role]
+          properties:
+            email: { type: string }
+            name: { type: string }
+            role: { type: string }
+        updatedAt: { type: string, format: date-time }
+    RequestCorrectionInput:
+      type: object
+      required: [formData, comment, expectedUpdatedAt]
+      properties:
+        formData:
+          type: object
+          additionalProperties: true
+        comment: { type: string, minLength: 1, maxLength: 4000 }
+        expectedUpdatedAt: { type: string, format: date-time }
     RequestActionInput:
       type: object
       required: [action]

@@ -381,6 +381,8 @@ export interface AuditEvent {
 export type RequestDetailFormData = { [key: string]: unknown };
 
 export type RequestDetail = RequestSummary & {
+  canEdit: boolean;
+  canApprove: boolean;
   formData: RequestDetailFormData;
   fields: WorkflowField[];
   stages: WorkflowStage[];
@@ -392,6 +394,33 @@ export type RequestInputFormData = { [key: string]: unknown };
 export interface RequestInput {
   workflowId: string;
   formData: RequestInputFormData;
+}
+
+export type RequestEditFormFormData = { [key: string]: unknown };
+
+export type RequestEditFormExpressionUser = {
+  email: string;
+  name: string;
+  role: string;
+};
+
+export interface RequestEditForm {
+  workflow: Workflow;
+  formData: RequestEditFormFormData;
+  expressionUser: RequestEditFormExpressionUser;
+  updatedAt: string;
+}
+
+export type RequestCorrectionInputFormData = { [key: string]: unknown };
+
+export interface RequestCorrectionInput {
+  formData: RequestCorrectionInputFormData;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  comment: string;
+  expectedUpdatedAt: string;
 }
 
 export type RequestActionInputAction = typeof RequestActionInputAction[keyof typeof RequestActionInputAction];
@@ -687,6 +716,13 @@ export type CreateRequest400FieldErrors = {[key: string]: string};
 export type CreateRequest400 = {
   error: string;
   fieldErrors?: CreateRequest400FieldErrors;
+};
+
+export type CorrectRequest400FieldErrors = {[key: string]: string};
+
+export type CorrectRequest400 = {
+  error: string;
+  fieldErrors?: CorrectRequest400FieldErrors;
 };
 
 export type GetStorageObjectParams = {

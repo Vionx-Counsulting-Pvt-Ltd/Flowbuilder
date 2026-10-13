@@ -1066,6 +1066,8 @@ export const CreateRequestResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }).and(zod.object({
+  "canEdit": zod.boolean(),
+  "canApprove": zod.boolean(),
   "formData": zod.record(zod.string(), zod.unknown()),
   "fields": zod.array(zod.object({
   "id": zod.string(),
@@ -1176,6 +1178,8 @@ export const GetRequestResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }).and(zod.object({
+  "canEdit": zod.boolean(),
+  "canApprove": zod.boolean(),
   "formData": zod.record(zod.string(), zod.unknown()),
   "fields": zod.array(zod.object({
   "id": zod.string(),
@@ -1248,6 +1252,237 @@ export const GetRequestResponse = zod.object({
 
 
 /**
+ * @summary Get a returned request's correction form (requester or workspace admin only)
+ */
+export const GetRequestEditFormParams = zod.object({
+  "requestId": zod.coerce.number().int()
+})
+
+
+
+export const getRequestEditFormResponseWorkflowFieldsItemReferenceMappingsMax = 50;
+
+export const getRequestEditFormResponseWorkflowFieldsItemWidthMax = 6;
+
+export const getRequestEditFormResponseWorkflowFieldsItemMinLengthMin = 0;
+
+export const getRequestEditFormResponseWorkflowFieldsItemMaxLengthMin = 0;
+
+export const getRequestEditFormResponseWorkflowFieldsItemMaxFilesMax = 10;
+
+export const getRequestEditFormResponseWorkflowFieldsItemMaxFileSizeMBMax = 25;
+
+
+
+
+export const GetRequestEditFormResponse = zod.object({
+  "workflow": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['draft', 'active', 'inactive']),
+  "version": zod.number().int(),
+  "routing": zod.enum(['sequential', 'parallel', 'conditional']),
+  "fields": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['text', 'textarea', 'longtext', 'name', 'email', 'phone', 'url', 'address', 'number', 'decimal', 'percent', 'price', 'date', 'time', 'datetime', 'duration', 'select', 'enum', 'multiselect', 'enumlist', 'checkbox', 'yesno', 'radio', 'progress', 'ref', 'file', 'image', 'thumbnail', 'drawing', 'signature', 'video', 'people', 'lookup', 'color', 'latlong', 'location', 'xy', 'show']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().nullish(),
+  "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(getRequestEditFormResponseWorkflowFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "initialValueExpression": zod.string().nullish(),
+  "appFormula": zod.string().nullish(),
+  "showIf": zod.string().nullish(),
+  "requiredIf": zod.string().nullish(),
+  "validIf": zod.string().nullish(),
+  "invalidMessage": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(getRequestEditFormResponseWorkflowFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(getRequestEditFormResponseWorkflowFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(getRequestEditFormResponseWorkflowFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(getRequestEditFormResponseWorkflowFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(getRequestEditFormResponseWorkflowFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
+})),
+  "stages": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "order": zod.number().int(),
+  "assigneeType": zod.enum(['role', 'user', 'manager']),
+  "assigneeId": zod.string().nullish(),
+  "assigneeLabel": zod.string(),
+  "slaHours": zod.number().int().min(1),
+  "conditionFieldId": zod.string().nullish(),
+  "conditionValue": zod.string().nullish()
+})),
+  "ownerUserId": zod.string(),
+  "ownerName": zod.string(),
+  "requestCount": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "formData": zod.record(zod.string(), zod.unknown()),
+  "expressionUser": zod.object({
+  "email": zod.string(),
+  "name": zod.string(),
+  "role": zod.string()
+}),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Correct a returned request and restart approval without changing its reference
+ */
+export const CorrectRequestParams = zod.object({
+  "requestId": zod.coerce.number().int()
+})
+
+export const correctRequestBodyCommentMax = 4000;
+
+
+
+export const CorrectRequestBody = zod.object({
+  "formData": zod.record(zod.string(), zod.unknown()),
+  "comment": zod.string().min(1).max(correctRequestBodyCommentMax),
+  "expectedUpdatedAt": zod.coerce.date()
+})
+
+
+
+export const correctRequestResponseTwoFieldsItemReferenceMappingsMax = 50;
+
+export const correctRequestResponseTwoFieldsItemWidthMax = 6;
+
+export const correctRequestResponseTwoFieldsItemMinLengthMin = 0;
+
+export const correctRequestResponseTwoFieldsItemMaxLengthMin = 0;
+
+export const correctRequestResponseTwoFieldsItemMaxFilesMax = 10;
+
+export const correctRequestResponseTwoFieldsItemMaxFileSizeMBMax = 25;
+
+
+
+
+export const CorrectRequestResponse = zod.object({
+  "id": zod.number().int(),
+  "requestCode": zod.string(),
+  "workflowId": zod.string(),
+  "workflowName": zod.string(),
+  "requesterId": zod.string(),
+  "requesterName": zod.string(),
+  "status": zod.enum(['submitted', 'pending_approval', 'needs_clarification', 'approved', 'rejected', 'completed']),
+  "currentStage": zod.number().int(),
+  "currentStageName": zod.string(),
+  "totalStages": zod.number().int(),
+  "dueAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).and(zod.object({
+  "canEdit": zod.boolean(),
+  "canApprove": zod.boolean(),
+  "formData": zod.record(zod.string(), zod.unknown()),
+  "fields": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['text', 'textarea', 'longtext', 'name', 'email', 'phone', 'url', 'address', 'number', 'decimal', 'percent', 'price', 'date', 'time', 'datetime', 'duration', 'select', 'enum', 'multiselect', 'enumlist', 'checkbox', 'yesno', 'radio', 'progress', 'ref', 'file', 'image', 'thumbnail', 'drawing', 'signature', 'video', 'people', 'lookup', 'color', 'latlong', 'location', 'xy', 'show']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().nullish(),
+  "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(correctRequestResponseTwoFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "initialValueExpression": zod.string().nullish(),
+  "appFormula": zod.string().nullish(),
+  "showIf": zod.string().nullish(),
+  "requiredIf": zod.string().nullish(),
+  "validIf": zod.string().nullish(),
+  "invalidMessage": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(correctRequestResponseTwoFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(correctRequestResponseTwoFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(correctRequestResponseTwoFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(correctRequestResponseTwoFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(correctRequestResponseTwoFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
+})),
+  "stages": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "order": zod.number().int(),
+  "assigneeType": zod.enum(['role', 'user', 'manager']),
+  "assigneeId": zod.string().nullish(),
+  "assigneeLabel": zod.string(),
+  "slaHours": zod.number().int().min(1),
+  "conditionFieldId": zod.string().nullish(),
+  "conditionValue": zod.string().nullish()
+})),
+  "audit": zod.array(zod.object({
+  "id": zod.number().int(),
+  "actorName": zod.string(),
+  "action": zod.string(),
+  "comment": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}))
+
+
+/**
  * @summary Approve, reject, or clarify a request
  */
 export const ActOnRequestParams = zod.object({
@@ -1291,6 +1526,8 @@ export const ActOnRequestResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }).and(zod.object({
+  "canEdit": zod.boolean(),
+  "canApprove": zod.boolean(),
   "formData": zod.record(zod.string(), zod.unknown()),
   "fields": zod.array(zod.object({
   "id": zod.string(),

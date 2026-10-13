@@ -230,6 +230,10 @@ export const requestsTable = pgTable("flow_requests", {
     .$type<WorkflowStage[]>()
     .notNull()
     .default([]),
+  routingSnapshot: jsonb("routing_snapshot")
+    .$type<WorkflowStage[]>()
+    .notNull()
+    .default([]),
   approvedStageIds: jsonb("approved_stage_ids")
     .$type<string[]>()
     .notNull()

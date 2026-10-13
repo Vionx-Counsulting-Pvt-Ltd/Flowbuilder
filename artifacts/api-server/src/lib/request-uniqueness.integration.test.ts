@@ -30,6 +30,10 @@ test("request uniqueness respects history, stable keys, workflow/tenant boundari
     assert.deepEqual(await requestUniquenessChecks(db, id, workflow, { epf: " 1003 " }), { epf: false });
     assert.deepEqual(await requestUniquenessChecks(db, id, workflow, { epf: "staff-abc" }), { epf: false });
     assert.deepEqual(await requestUniquenessChecks(db, id, workflow, { epf: "1004" }), { epf: false });
+    const [own] = await db.select({ id: requestsTable.id }).from(requestsTable)
+      .where(eq(requestsTable.requestCode, `${id}-legacy`)).limit(1);
+    assert.deepEqual(await requestUniquenessChecks(db, id, workflow, { epf: "1004" }, own.id), { epf: true });
+    assert.deepEqual(await requestUniquenessChecks(db, id, workflow, { epf: "staff-abc" }, own.id), { epf: false });
     assert.deepEqual(await requestUniquenessChecks(db, id, workflow, { epf: "2000" }), { epf: true });
     assert.deepEqual(await requestUniquenessChecks(db, `${id}-other-tenant`, workflow, { epf: 1003 }), { epf: true });
     assert.deepEqual(await requestUniquenessChecks(db, id, workflow, { epf: "" }), { epf: true });

@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CorrectRequest400,
   CreateRequest400,
   CurrentUser,
   DashboardSummary,
@@ -39,7 +40,9 @@ import type {
   ReferenceTableInput,
   ReportOverview,
   RequestActionInput,
+  RequestCorrectionInput,
   RequestDetail,
+  RequestEditForm,
   RequestInput,
   RequestSummary,
   RoleInput,
@@ -1628,6 +1631,172 @@ export function useGetRequest<TData = Awaited<ReturnType<typeof getRequest>>, TE
 
 
 
+
+export const getGetRequestEditFormUrl = (requestId: number,) => {
+
+
+
+
+  return `/api/requests/${requestId}/edit-form`
+}
+
+/**
+ * @summary Get a returned request's correction form (requester or workspace admin only)
+ */
+export const getRequestEditForm = async (requestId: number, options?: Parameters<typeof customFetch>[1]): Promise<RequestEditForm> => {
+
+  return customFetch<RequestEditForm>(getGetRequestEditFormUrl(requestId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRequestEditFormQueryKey = (requestId: number,) => {
+    return [
+    `/api/requests/${requestId}/edit-form`
+    ] as const;
+    }
+
+
+export const getGetRequestEditFormQueryOptions = <TData = Awaited<ReturnType<typeof getRequestEditForm>>, TError = ErrorType<void>>(requestId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRequestEditForm>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRequestEditFormQueryKey(requestId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRequestEditForm>>> = ({ signal }) => getRequestEditForm(requestId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: requestId !== null && requestId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRequestEditForm>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRequestEditFormQueryResult = NonNullable<Awaited<ReturnType<typeof getRequestEditForm>>>
+export type GetRequestEditFormQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a returned request's correction form (requester or workspace admin only)
+ */
+
+export function useGetRequestEditForm<TData = Awaited<ReturnType<typeof getRequestEditForm>>, TError = ErrorType<void>>(
+ requestId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRequestEditForm>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRequestEditFormQueryOptions(requestId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCorrectRequestUrl = (requestId: number,) => {
+
+
+
+
+  return `/api/requests/${requestId}/corrections`
+}
+
+/**
+ * @summary Correct a returned request and restart approval without changing its reference
+ */
+export const correctRequest = async (requestId: number,
+    requestCorrectionInput: RequestCorrectionInput, options?: Parameters<typeof customFetch>[1]): Promise<RequestDetail> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RequestDetail>(getCorrectRequestUrl(requestId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(requestCorrectionInput)
+  }
+);}
+
+
+
+
+
+export const getCorrectRequestMutationKey = () => ['correctRequest'] as const;
+
+export const getCorrectRequestMutationOptions = <TError = ErrorType<CorrectRequest400 | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof correctRequest>>, TError,CorrectRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof correctRequest>>, TError,CorrectRequestMutationVariables, TContext> => {
+
+const mutationKey = getCorrectRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof correctRequest>>, CorrectRequestMutationVariables> = (props) => {
+          const {requestId,data} = props ?? {};
+
+          return  correctRequest(requestId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CorrectRequestMutationResult = NonNullable<Awaited<ReturnType<typeof correctRequest>>>
+    export type CorrectRequestMutationBody = BodyType<RequestCorrectionInput>
+    export type CorrectRequestMutationError = ErrorType<CorrectRequest400 | void>
+    export type CorrectRequestMutationVariables = {requestId: number;data: BodyType<RequestCorrectionInput>}
+
+    /**
+ * @summary Correct a returned request and restart approval without changing its reference
+ */
+export const useCorrectRequest = <TError = ErrorType<CorrectRequest400 | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof correctRequest>>, TError,CorrectRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof correctRequest>>,
+        TError,
+        CorrectRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCorrectRequestMutationOptions(options));
+    }
 
 export const getActOnRequestUrl = (requestId: number,) => {
 

@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { db, requestsTable, type WorkflowField } from "@workspace/db";
 import { ExpressionError, expressionUsesRequestHistory, getUniqueFieldIds } from "@workspace/workflow-expressions";
 
@@ -17,7 +17,7 @@ export async function lockRequestUniqueness(connection: Connection, tenantId: st
 
 /** Only booleans reach expression evaluation; never send other requesters' answers to the browser. */
 export async function requestUniquenessChecks(
-  connection: Connection, tenantId: string, workflow: Workflow, values: Record<string, unknown>,
+  connection: Connection, tenantId: string, workflow: Workflow, values: Record<string, unknown>, excludeRequestId?: number,
 ): Promise<Record<string, boolean>> {
   const checks: Record<string, boolean> = {};
   for (const id of uniquenessFieldIds(workflow.fields)) {
@@ -30,6 +30,7 @@ export async function requestUniquenessChecks(
     const [existing] = await connection.select({ id: requestsTable.id }).from(requestsTable).where(and(
       eq(requestsTable.tenantId, tenantId),
       eq(requestsTable.workflowId, workflow.id),
+      excludeRequestId == null ? undefined : ne(requestsTable.id, excludeRequestId),
       sql`(lower(btrim(${requestsTable.formData}->>${id})) = ${normalized} or exists (
         select 1 from jsonb_array_elements(${requestsTable.fieldsSnapshot}) historical_field
         where (historical_field->>'id' = ${id}

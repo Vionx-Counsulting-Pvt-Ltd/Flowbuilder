@@ -7,6 +7,8 @@
  */
 
 export * from './auditEvent';
+export * from './correctRequest400';
+export * from './correctRequest400FieldErrors';
 export * from './createRequest400';
 export * from './createRequest400FieldErrors';
 export * from './currentUser';
@@ -39,8 +41,13 @@ export * from './referenceValues';
 export * from './reportOverview';
 export * from './requestActionInput';
 export * from './requestActionInputAction';
+export * from './requestCorrectionInput';
+export * from './requestCorrectionInputFormData';
 export * from './requestDetail';
 export * from './requestDetailFormData';
+export * from './requestEditForm';
+export * from './requestEditFormExpressionUser';
+export * from './requestEditFormFormData';
 export * from './requestInput';
 export * from './requestInputFormData';
 export * from './requestStatus';

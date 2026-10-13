@@ -7,12 +7,17 @@ import {
   getGetReportOverviewQueryKey,
   getListRequestsQueryKey,
   useCreateRequest,
+  useCorrectRequest,
+  useGetRequestEditForm,
+  getGetRequestQueryKey,
+  getGetRequestEditFormQueryKey,
+  getListNotificationsQueryKey,
   useGetCurrentUser,
   useGetWorkflow,
   useListPeople,
   useRequestUploadUrl,
 } from "@workspace/api-client-react";
-import type { Workflow, WorkflowField } from "@workspace/api-client-react";
+import type { RequestDetail, Workflow, WorkflowField } from "@workspace/api-client-react";
 import { applyLockedReferenceMappings, fillReferenceSelection, computeFormExpressions, evaluateExpression, expressionUsesRequestHistory, type ExpressionContext, type ExpressionUser } from "@workspace/workflow-expressions";
 import { ArrowRight, LoaderCircle, MapPin, Paperclip, X } from "lucide-react";
 
@@ -134,22 +139,29 @@ function DrawingCapture({
   </div>;
 }
 
-export default function RequestFormModal({ workflows, onClose }: { workflows: Workflow[]; onClose: () => void }) {
+export default function RequestFormModal({ workflows, onClose, correctionRequestId }: { workflows: Workflow[]; onClose: () => void; correctionRequestId?: number }) {
   const queryClient = useQueryClient();
   const create = useCreateRequest();
-  const failureData = create.error?.data;
+  const correct = useCorrectRequest();
+  const correctionForm = useGetRequestEditForm(correctionRequestId ?? 0, {
+    query: { queryKey: getGetRequestEditFormQueryKey(correctionRequestId ?? 0), enabled: correctionRequestId != null, staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: false },
+  });
+  const mutation = correctionRequestId != null ? correct : create;
+  const [correctionNote, setCorrectionNote] = useState("");
+  const failureData = mutation.error?.data;
   const failureMessage = failureData && typeof failureData === "object" && "error" in failureData && typeof failureData.error === "string"
     ? failureData.error : "Could not submit this request. Please check the fields and try again.";
   const current = useGetCurrentUser();
   const upload = useRequestUploadUrl();
   const people = useListPeople();
-  const expressionUser = useMemo<ExpressionUser | undefined>(() => current.data
+  const expressionUser = useMemo<ExpressionUser | undefined>(() => correctionForm.data?.expressionUser ?? (current.data
     ? { email: current.data.email, name: current.data.name, role: current.data.roleName }
-    : undefined, [current.data?.email, current.data?.name, current.data?.roleName]);
+    : undefined), [correctionForm.data?.expressionUser, current.data?.email, current.data?.name, current.data?.roleName]);
   const [, setLocation] = useLocation();
   const [workflowId, setWorkflowId] = useState(workflows.find(workflow => workflow.status === "active")?.id ?? "");
-  const detail = useGetWorkflow(workflowId, { query: { queryKey: getGetWorkflowQueryKey(workflowId), enabled: Boolean(workflowId), staleTime: 0, refetchInterval: 15000 } });
-  const selected = detail.data ?? workflows.find(workflow => workflow.id === workflowId);
+  const detail = useGetWorkflow(workflowId, { query: { queryKey: getGetWorkflowQueryKey(workflowId), enabled: Boolean(workflowId) && correctionRequestId == null, staleTime: 0, refetchInterval: 15000 } });
+  const formQuery = correctionRequestId != null ? correctionForm : detail;
+  const selected = correctionRequestId != null ? correctionForm.data?.workflow : detail.data ?? workflows.find(workflow => workflow.id === workflowId);
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
@@ -166,16 +178,17 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
     if (current.isLoading) return;
     const fields = selected?.fields ?? [];
     let initial = initialValues(fields, expressionUser);
-    for (const source of fields) if (source.referenceMappings?.length) initial = fillReferenceSelection(fields, initial, source.id, initial[source.id]);
+    if (correctionRequestId != null) initial = { ...initial, ...correctionForm.data?.formData };
+    else for (const source of fields) if (source.referenceMappings?.length) initial = fillReferenceSelection(fields, initial, source.id, initial[source.id]);
     setValues(initial);
     setErrors({});
     setUploadErrors({});
-  }, [workflowId, selected?.id, expressionUser, current.isLoading]);
+  }, [workflowId, selected?.id, expressionUser, current.isLoading, correctionRequestId, correctionForm.data?.updatedAt]);
 
   function updateValue(id: string, value: unknown) {
     setValues(current => fillReferenceSelection(selected?.fields ?? [], current, id, value));
     setErrors(current => ({ ...current, [id]: "" }));
-    if (!create.isPending) create.reset();
+    if (!mutation.isPending) mutation.reset();
   }
 
   async function uploadFiles(field: WorkflowField, fileList: FileList | File[] | null) {
@@ -225,6 +238,8 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mutation.isPending || formQuery.isError || formQuery.isLoading ||
+        (correctionRequestId != null && !correctionNote.trim())) return;
     if (!selected || detail.isError || detail.isLoading || uploadInProgress.current || Object.values(uploadErrors).some(Boolean)) return;
     const fields = selected.fields;
     const nextErrors: Record<string, string> = {};
@@ -263,21 +278,29 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
     if (Object.keys(nextErrors).length || uploadingField) return;
     const formData: Record<string, unknown> = { ...computedValues };
     for (const field of fields) if (field.type === "show" || !isVisible(field, fields, computedValues, expressionUser)) delete formData[field.id];
-    create.mutate({ data: { workflowId, formData } }, {
-      onError: error => {
+    const callbacks = {
+      onError: (error: { data?: unknown }) => {
         const data = error.data;
         if (data && typeof data === "object" && "fieldErrors" in data && data.fieldErrors && typeof data.fieldErrors === "object") {
           setErrors(Object.fromEntries(Object.entries(data.fieldErrors).filter(([id, message]) => fields.some(field => field.id === id) && typeof message === "string")) as Record<string, string>);
         }
       },
-      onSuccess: request => {
+      onSuccess: (request: RequestDetail) => {
+        void queryClient.invalidateQueries({ queryKey: getGetRequestQueryKey(request.id) });
+        void queryClient.invalidateQueries({ queryKey: getGetRequestEditFormQueryKey(request.id) });
+        void queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getListRequestsQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getGetReportOverviewQueryKey() });
         onClose();
         setLocation(`/requests/${request.id}`);
       },
-    });
+    };
+    if (correctionRequestId != null && correctionForm.data) {
+      correct.mutate({ requestId: correctionRequestId, data: {
+        formData, comment: correctionNote.trim(), expectedUpdatedAt: correctionForm.data.updatedAt,
+      } }, callbacks);
+    } else if (correctionRequestId == null) create.mutate({ data: { workflowId, formData } }, callbacks);
   }
 
   function renderControl(field: WorkflowField, value: unknown, disabled: boolean, required: boolean): ReactNode {
@@ -303,12 +326,12 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
       const isImage = ["image", "thumbnail", "drawing", "signature"].includes(field.type);
       const accept = field.accept || (isImage ? "image/*" : undefined);
       return <div className="space-y-2">
-        {(field.type === "drawing" || field.type === "signature") && <DrawingCapture fieldType={field.type} disabled={disabled || Boolean(uploadingField) || current.isLoading || create.isPending} onCapture={file => void uploadFiles(field, [file])} />}
+        {(field.type === "drawing" || field.type === "signature") && <DrawingCapture fieldType={field.type} disabled={disabled || Boolean(uploadingField) || current.isLoading || mutation.isPending} onCapture={file => void uploadFiles(field, [file])} />}
         <label className="relative flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm focus-within:ring-2 focus-within:ring-primary/30">
           {uploadingField === field.id ? <LoaderCircle className="animate-spin" size={16} /> : <Paperclip size={16} />}
           {uploadingField === field.id ? "Uploading…" : ["signature", "drawing"].includes(field.type) ? "Or upload an image" : "Choose file"}
           {/* Keep the focusable picker inside the visible upload area so native focus cannot scroll the form to a hidden control. */}
-          <input id={`request-${field.id}`} className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed" data-testid={dataTestId} type="file" disabled={disabled || Boolean(uploadingField) || current.isLoading || create.isPending} multiple={Boolean(field.multiple)} accept={accept} onChange={event => {
+          <input id={`request-${field.id}`} className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed" data-testid={dataTestId} type="file" disabled={disabled || Boolean(uploadingField) || current.isLoading || mutation.isPending} multiple={Boolean(field.multiple)} accept={accept} onChange={event => {
             // FileList is live: resetting the picker empties it, so retain the File objects first.
             const selectedFiles = Array.from(event.currentTarget.files ?? []);
             event.currentTarget.value = "";
@@ -316,9 +339,9 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
           }} />
         </label>
         <p className="text-xs text-muted-foreground">{["drawing", "signature"].includes(field.type) ? "Captured or uploaded image is stored privately in this workspace." : "Private workspace upload."} · up to {field.multiple ? field.maxFiles ?? 10 : 1} file{field.multiple ? "s" : ""} · {field.maxFileSizeMB ?? 20} MB each.</p>
-        {files.map(file => <div key={file.fileId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"><span className="truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="text-destructive" disabled={Boolean(uploadingField) || create.isPending} data-testid={`remove-upload-${field.id}-${file.fileId}`} onClick={() => onChange(files.filter(item => item.fileId !== file.fileId))}>Remove</button></div>)}
+        {files.map(file => <div key={file.fileId} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"><span className="truncate">{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" className="text-destructive" disabled={Boolean(uploadingField) || mutation.isPending} data-testid={`remove-upload-${field.id}-${file.fileId}`} onClick={() => onChange(files.filter(item => item.fileId !== file.fileId))}>Remove</button></div>)}
         {!files.length && !uploadingField && !uploadErrors[field.id] && <p className="text-xs text-muted-foreground">No files attached. Selected files must appear here before you submit.</p>}
-        {uploadErrors[field.id] && <div className="rounded-lg border border-destructive/30 p-3 text-sm" role="alert" data-testid={`upload-error-${field.id}`}><p className="form-error">{uploadErrors[field.id]}</p><button type="button" className="text-link mt-2" disabled={Boolean(uploadingField) || create.isPending} onClick={() => setUploadErrors(current => ({ ...current, [field.id]: "" }))}>Clear failed selection{files.length ? " (keep uploaded files)" : " (no files attached)"}</button></div>}
+        {uploadErrors[field.id] && <div className="rounded-lg border border-destructive/30 p-3 text-sm" role="alert" data-testid={`upload-error-${field.id}`}><p className="form-error">{uploadErrors[field.id]}</p><button type="button" className="text-link mt-2" disabled={Boolean(uploadingField) || mutation.isPending} onClick={() => setUploadErrors(current => ({ ...current, [field.id]: "" }))}>Clear failed selection{files.length ? " (keep uploaded files)" : " (no files attached)"}</button></div>}
       </div>;
     }
     if (["location", "latlong", "xy"].includes(field.type)) return <div className="flex gap-2"><input className="input-control" data-testid={dataTestId} type="text" disabled={disabled} value={String(value ?? "")} placeholder={field.placeholder || (field.type === "xy" ? "X, Y" : "Latitude, longitude")} onChange={event => onChange(event.target.value)} />{field.type !== "xy" && <button type="button" className="button button-outline shrink-0" disabled={disabled || locatingField === field.id} onClick={() => requestLocation(field)} aria-label="Use browser location">{locatingField === field.id ? <LoaderCircle size={15} className="animate-spin" /> : <MapPin size={15} />}</button>}</div>;
@@ -330,17 +353,17 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
   return <div className="modal-backdrop" role="presentation">
     <section className="modal-panel w-full max-w-2xl" role="dialog" aria-modal="true" aria-labelledby="request-modal-title">
       <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
-        <div><span className="section-label">NEW WORKFLOW REQUEST</span><h2 id="request-modal-title" className="mt-1 text-xl font-semibold">Start a request</h2><p className="mt-1 text-sm text-muted-foreground">Choose a workflow and share the context your approvers need.</p></div>
-        <button type="button" className="icon-button" aria-label="Close request form" data-testid="button-close-request-form" onClick={onClose}><X size={18} /></button>
+        <div><span className="section-label">{correctionRequestId != null ? "RETURNED FOR CORRECTION" : "NEW WORKFLOW REQUEST"}</span><h2 id="request-modal-title" className="mt-1 text-xl font-semibold">{correctionRequestId != null ? "Correct and resubmit" : "Start a request"}</h2><p className="mt-1 text-sm text-muted-foreground">{correctionRequestId != null ? "Update the requested details. The reference stays the same and approval restarts." : "Choose a workflow and share the context your approvers need."}</p></div>
+        <button type="button" className="icon-button" aria-label="Close request form" data-testid="button-close-request-form" disabled={mutation.isPending || Boolean(uploadingField)} onClick={onClose}><X size={18} /></button>
       </div>
       <form onSubmit={submit} className="max-h-[75dvh] space-y-4 overflow-y-auto px-6 py-5">
-        <label className="form-field"><span>Workflow</span><select className="input-control" data-testid="select-request-workflow" value={workflowId} disabled={Boolean(uploadingField) || create.isPending} onChange={event => setWorkflowId(event.target.value)} required><option value="">Choose a workflow</option>{workflows.filter(workflow => workflow.status === "active").map(workflow => <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>)}</select></label>
+        {correctionRequestId == null ? <label className="form-field"><span>Workflow</span><select className="input-control" data-testid="select-request-workflow" value={workflowId} disabled={Boolean(uploadingField) || mutation.isPending} onChange={event => setWorkflowId(event.target.value)} required><option value="">Choose a workflow</option>{workflows.filter(workflow => workflow.status === "active").map(workflow => <option key={workflow.id} value={workflow.id}>{workflow.name} · {workflow.category}</option>)}</select></label> : <p className="text-sm font-medium">{selected?.name ?? "Loading correction form…"}</p>}
         {selected?.fields.filter(field => isVisible(field, selected.fields, computedValues, expressionUser)).map(field => {
           const value = computedValues[field.id];
           const required = field.required || Boolean(evaluate(field.requiredIf, selected.fields, { ...computedValues, _THIS: value }, false, expressionUser));
           if (field.type === "show") return <div key={field.id} className="rounded-lg border border-border bg-muted/50 px-4 py-3 text-sm" data-testid={`show-request-${field.id}`}><strong>{field.label}</strong>{field.helpText && <p className="mt-1 text-muted-foreground">{field.helpText}</p>}{field.placeholder && <p className="mt-1">{field.placeholder}</p>}</div>;
           const mapping = selected.fields.flatMap(source => source.referenceMappings ?? []).find(mapping => mapping.targetFieldId === field.id);
-          const disabled = Boolean(field.readOnly || field.appFormula || mapping?.mode === "locked");
+          const disabled = Boolean(field.readOnly || field.appFormula || mapping?.mode === "locked" || mutation.isPending);
           return <div className="form-field block" key={field.id}>
             <label htmlFor={`request-${field.id}`}><span>{field.label}{required ? " *" : ""}</span></label>
             {field.prefix || field.suffix ? <div className="flex items-center gap-2">{field.prefix && <span className="text-xs text-muted-foreground">{field.prefix}</span>}{renderControl(field, value, disabled, required)}{field.suffix && <span className="text-xs text-muted-foreground">{field.suffix}</span>}</div> : renderControl(field, value, disabled, required)}
@@ -353,9 +376,10 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
         })}
         {!selected && <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">{workflows.length ? "Select an active workflow to see its form." : "There are no active workflows yet."}</p>}
         {Object.values(uploadErrors).some(Boolean) && <p className="form-error" role="alert" data-testid="status-upload-error">Resolve the file upload error above before submitting, or explicitly clear the failed selection.</p>}
-        {detail.isError && <p className="form-error" role="alert">The latest form choices could not be loaded. <button type="button" onClick={() => void detail.refetch()}>Retry</button></p>}
-        {create.isError && <p className="form-error" role="alert" data-testid="status-request-error">{failureMessage}</p>}
-        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-outline modal-footer-btn" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary modal-footer-btn" data-testid="button-submit-request" disabled={!selected || current.isLoading || detail.isLoading || detail.isError || create.isPending || Boolean(uploadingField) || Object.values(uploadErrors).some(Boolean)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
+        {correctionRequestId != null && <label className="form-field"><span>Correction note *</span><textarea className="input-control" data-testid="input-correction-note" value={correctionNote} onChange={event => setCorrectionNote(event.target.value)} required maxLength={4000} placeholder="Explain what you corrected for the approver." /></label>}
+        {formQuery.isError && <p className="form-error" role="alert">This form could not be loaded, or editing is no longer allowed. <button type="button" onClick={() => void formQuery.refetch()}>Retry</button></p>}
+        {mutation.isError && <p className="form-error" role="alert" data-testid="status-request-error">{failureMessage}</p>}
+        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-outline modal-footer-btn" onClick={onClose} disabled={mutation.isPending || Boolean(uploadingField)}>Cancel</button><button type="submit" className="button button-primary modal-footer-btn" data-testid="button-submit-request" disabled={!selected || current.isLoading || formQuery.isLoading || formQuery.isError || mutation.isPending || Boolean(uploadingField) || Object.values(uploadErrors).some(Boolean) || (correctionRequestId != null && !correctionNote.trim())}>{mutation.isPending ? "Submitting…" : correctionRequestId != null ? "Resubmit request" : "Submit request"} <ArrowRight size={15} /></button></div>
       </form>
     </section>
   </div>;

@@ -11,3 +11,5 @@
 - [Attachment preview safety](attachment-preview-safety.md) — uploaded active content must never execute on the authenticated portal's origin.
 - [EPF uniqueness policy](epf-uniqueness-policy.md) — check Staff Onboarding request history within the same workflow and workspace, not employee tables.
 - [Drizzle test isolation](drizzle-test-isolation.md) — outer query mocks do not isolate transactions; transaction-scoped operations need their own test doubles.
+- [Request correction policy](request-correction-policy.md) — only returned requests are editable by their requester or workspace admins; corrected data must restart approval.
+- [PostgreSQL timestamp precision](postgres-timestamp-precision.md) — optimistic timestamp guards must use consistent precision and strictly monotonic update versions.

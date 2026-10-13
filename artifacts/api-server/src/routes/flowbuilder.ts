@@ -4,6 +4,9 @@ import {
   ActOnRequestResponse,
   CreateRequestBody,
   CreateRequestResponse,
+  CorrectRequestBody,
+  GetRequestEditFormParams,
+  GetRequestEditFormResponse,
   CreateRoleBody,
   CreateRoleResponse,
   CreatePlatformTenantBody,
@@ -54,6 +57,7 @@ import {
   lt,
   ne,
   or,
+  sql,
 } from "drizzle-orm";
 import {
   auditEventsTable,
@@ -74,7 +78,7 @@ import {
   expressionUsesRequestHistory,
   ExpressionError,
 } from "@workspace/workflow-expressions";
-import { Router, type IRouter, type RequestHandler, type Response } from "express";
+import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
 import {
   currentMember,
   hasPermission,
@@ -84,6 +88,7 @@ import {
 import { ObjectStorageService } from "../lib/objectStorage";
 import { allocateRequestReference } from "../lib/request-reference";
 import { lockRequestUniqueness, requestUniquenessChecks, uniquenessFieldIds } from "../lib/request-uniqueness";
+import { canEditReturnedRequest, canViewReturnedApproval, correctionContext } from "../lib/request-corrections";
 import { authoritativeReferenceAnswers, hydrateReferenceFields, ReferenceDataError, snapshotReferenceFields, storedReferenceFields } from "../lib/reference-data";
 import type {
   WorkflowField,
@@ -97,6 +102,7 @@ type RequestRow = {
   workflowName: string;
   workflowOwnerId: string;
   requesterName: string;
+  requesterManagerId?: string | null;
 };
 
 const isOrgAdmin = (member: MemberContext) =>
@@ -628,7 +634,8 @@ function canSeeRequest(
     row.workflowOwnerId === member.id ||
     row.request.assignedUserId === member.id ||
     row.request.assignedRoleId === member.roleId ||
-    assignedStages(row.request, member).length > 0
+    assignedStages(row.request, member).length > 0 ||
+    canViewReturnedApproval(row.request, member, row.requesterManagerId)
   );
 }
 
@@ -655,7 +662,7 @@ function requestSummary(row: RequestRow) {
     requesterId: row.request.requesterId,
     requesterName: row.requesterName,
     status: row.request.status,
-    currentStage: row.request.currentStage + 1,
+    currentStage: Math.min(row.request.currentStage + 1, groups.length),
     currentStageName,
     totalStages: groups.length,
     dueAt: row.request.dueAt,
@@ -674,6 +681,7 @@ async function getRequestRows(
       workflowName: workflowsTable.name,
       workflowOwnerId: workflowsTable.ownerUserId,
       requesterName: usersTable.name,
+      requesterManagerId: usersTable.managerId,
     })
     .from(requestsTable)
     .innerJoin(
@@ -689,6 +697,7 @@ async function getRequestRows(
 async function getRequestDetail(
   requestId: number,
   tenantId: string,
+  member?: MemberContext,
 ): Promise<unknown | null> {
   const [row] = await db
     .select({
@@ -696,6 +705,7 @@ async function getRequestDetail(
       workflowName: workflowsTable.name,
       workflowOwnerId: workflowsTable.ownerUserId,
       requesterName: usersTable.name,
+      requesterManagerId: usersTable.managerId,
     })
     .from(requestsTable)
     .innerJoin(
@@ -729,6 +739,8 @@ async function getRequestDetail(
 
   return {
     ...requestSummary(row),
+    canEdit: member ? canEditReturnedRequest(row.request, member) : false,
+    canApprove: member ? row.request.status === "pending_approval" && canActOnRequest(row.request, member) : false,
     formData: row.request.formData,
     fields: row.request.fieldsSnapshot,
     stages: row.request.stagesSnapshot,
@@ -1363,28 +1375,63 @@ router.get("/requests", async (req, res): Promise<void> => {
   res.json(ListRequestsResponse.parse(rows.map(requestSummary)));
 });
 
-router.post("/requests", async (req, res): Promise<void> => {
+async function submitRequest(req: Request, res: Response): Promise<void> {
   const member = currentMember(res);
-  if (!hasPermission(member, "create")) {
+  const correctionId = req.params.requestId ? Number(req.params.requestId) : undefined;
+  if (correctionId != null && (!Number.isInteger(correctionId) || correctionId < 1)) {
+    res.status(400).json({ error: "Invalid request ID." });
+    return;
+  }
+  const [original] = correctionId == null ? [] : await db.select().from(requestsTable).where(and(
+    eq(requestsTable.id, correctionId), eq(requestsTable.tenantId, member.tenantId),
+  )).limit(1);
+  if (correctionId != null && !original) {
+    res.status(404).json({ error: "Request not found." });
+    return;
+  }
+  if (original && !canEditReturnedRequest(original, member)) {
+    res.status(403).json({ error: "Only the requester or a workspace admin can edit a returned request." });
+    return;
+  }
+  if (!original && !hasPermission(member, "create")) {
     res.status(403).json({ error: "You do not have permission to submit requests." });
     return;
   }
-  const parsed = CreateRequestBody.safeParse(req.body);
+  const parsed = original ? CorrectRequestBody.safeParse(req.body) : CreateRequestBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [workflow] = await db
+  if (original && "expectedUpdatedAt" in parsed.data &&
+      parsed.data.expectedUpdatedAt.getTime() !== original.updatedAt.getTime()) {
+    res.status(409).json({ error: "This request changed while you were editing. Close and reopen the correction form." });
+    return;
+  }
+  const correction = original ? await correctionContext(original, member) : null;
+  if (original && !correction) {
+    res.status(409).json({ error: "The original workflow or requester is unavailable." });
+    return;
+  }
+  const correctionComment = "comment" in parsed.data ? parsed.data.comment.trim() : "";
+  const expectedUpdatedAt = "expectedUpdatedAt" in parsed.data ? parsed.data.expectedUpdatedAt : undefined;
+  if (original && !correctionComment) {
+    res.status(400).json({ error: "Add a note explaining the correction." });
+    return;
+  }
+  const formMember = correction?.expressionMember ?? member;
+  const workflowId = original?.workflowId ?? ("workflowId" in parsed.data ? parsed.data.workflowId : "");
+  const [activeWorkflow] = original ? [] : await db
     .select()
     .from(workflowsTable)
     .where(
       and(
-        eq(workflowsTable.id, parsed.data.workflowId),
+        eq(workflowsTable.id, workflowId),
         eq(workflowsTable.tenantId, member.tenantId),
         eq(workflowsTable.status, "active"),
       ),
     )
     .limit(1);
+  const workflow = correction?.workflow ?? activeWorkflow;
   if (!workflow) {
     res.status(404).json({ error: "Active workflow not found." });
     return;
@@ -1399,17 +1446,20 @@ router.post("/requests", async (req, res): Promise<void> => {
     .select({ value: count() })
     .from(requestsTable)
     .where(eq(requestsTable.tenantId, member.tenantId));
-  if (tenant && (requestCount?.value ?? 0) >= tenant.requestLimit) {
+  if (!original && tenant && (requestCount?.value ?? 0) >= tenant.requestLimit) {
     res.status(403).json({ error: "This workspace has reached its request limit." });
     return;
   }
-  const submissionData: Record<string, unknown> = { ...parsed.data.formData };
+  // Do not persist unknown/unsubmitted fields supplied by a malicious caller.
+  const submissionData: Record<string, unknown> = Object.fromEntries(workflow.fields
+    .filter(field => Object.hasOwn(parsed.data.formData, field.id))
+    .map(field => [field.id, parsed.data.formData[field.id]]));
   for (const field of workflow.fields) {
-    if (field.appFormula?.trim() || (field.readOnly && field.initialValueExpression?.trim())) {
+    if (field.appFormula?.trim() || (!original && field.readOnly && field.initialValueExpression?.trim())) {
       delete submissionData[field.id];
     } else if (field.readOnly) {
       submissionData[field.id] =
-        field.type === "checkbox"
+        original ? original.formData[field.id] ?? "" : field.type === "checkbox"
           ? field.defaultValue === "true"
           : field.defaultValue ?? "";
     }
@@ -1420,7 +1470,7 @@ router.post("/requests", async (req, res): Promise<void> => {
     calculatedData = computeFormExpressions(
       workflow.fields,
       submissionData,
-      { email: member.email, name: member.name, role: member.roleName },
+      { email: formMember.email, name: formMember.name, role: formMember.roleName },
     );
   } catch (error) {
     res.status(400).json({
@@ -1432,27 +1482,27 @@ router.post("/requests", async (req, res): Promise<void> => {
   }
   Object.assign(submissionData, calculatedData);
   for (const field of workflow.fields) {
-    if (field.type === "show" || !isFieldVisible(field, workflow.fields, submissionData, member)) {
+    if (field.type === "show" || !isFieldVisible(field, workflow.fields, submissionData, formMember)) {
       delete submissionData[field.id];
     }
   }
   const fieldErrors: Record<string, string> = {};
   let uniqueChecks: Record<string, boolean>;
   try {
-    uniqueChecks = await requestUniquenessChecks(db, member.tenantId, workflow, submissionData);
+    uniqueChecks = await requestUniquenessChecks(db, member.tenantId, workflow, submissionData, original?.id);
   } catch (error) {
     if (!(error instanceof ExpressionError)) throw error;
     res.status(400).json({ error: error.message });
     return;
   }
-  const formError = formSubmissionError(workflow.fields, submissionData, member, uniqueChecks, fieldErrors);
+  const formError = formSubmissionError(workflow.fields, submissionData, formMember, uniqueChecks, fieldErrors);
   if (formError) {
     res.status(400).json({ error: formError, fieldErrors });
     return;
   }
   const selectedPeople = new Set<string>();
   for (const field of workflow.fields) {
-    if (field.type !== "people" || !isFieldVisible(field, workflow.fields, submissionData, member)) continue;
+    if (field.type !== "people" || !isFieldVisible(field, workflow.fields, submissionData, formMember)) continue;
     const value = submissionData[field.id];
     for (const id of Array.isArray(value) ? value : value ? [value] : []) {
       if (typeof id === "string") selectedPeople.add(id);
@@ -1475,7 +1525,7 @@ router.post("/requests", async (req, res): Promise<void> => {
     }
   }
   for (const field of workflow.fields) {
-    if (!uploadFieldTypes.has(field.type) || !isFieldVisible(field, workflow.fields, submissionData, member)) continue;
+    if (!uploadFieldTypes.has(field.type) || !isFieldVisible(field, workflow.fields, submissionData, formMember)) continue;
     const files = submissionData[field.id] as Array<{
       fileId: string;
       name: string;
@@ -1544,7 +1594,7 @@ router.post("/requests", async (req, res): Promise<void> => {
   const [requester] = await db
     .select({ managerId: usersTable.managerId })
     .from(usersTable)
-    .where(eq(usersTable.id, member.id))
+    .where(and(eq(usersTable.id, original?.requesterId ?? member.id), eq(usersTable.tenantId, member.tenantId)))
     .limit(1);
   const initialStages = eligibleStages.filter(
     (stage) => stage.order === groupedStages(eligibleStages)[0],
@@ -1555,18 +1605,42 @@ router.post("/requests", async (req, res): Promise<void> => {
     requester?.managerId ?? null,
   );
   const dueHours = Math.min(...initialStages.map((stage) => stage.slaHours));
-  const createdAt = new Date();
+  const createdAt = new Date(Math.max(Date.now(), (original?.updatedAt.getTime() ?? 0) + 1));
   let uniquenessFailure: { error: string; fieldErrors: Record<string, string> } | undefined;
+  let correctionConflict = false;
   const saved = await db.transaction(async tx => {
+    if (original) {
+      const [locked] = await tx.select().from(requestsTable).where(and(
+        eq(requestsTable.id, original.id), eq(requestsTable.tenantId, member.tenantId),
+      )).limit(1).for("update");
+      if (!locked || !canEditReturnedRequest(locked, member) ||
+          !expectedUpdatedAt || locked.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+        correctionConflict = true;
+        return null;
+      }
+    }
     if (uniquenessFieldIds(workflow.fields).length) {
       await lockRequestUniqueness(tx, member.tenantId, workflow.id);
-      const lockedChecks = await requestUniquenessChecks(tx, member.tenantId, workflow, submissionData);
+      const lockedChecks = await requestUniquenessChecks(tx, member.tenantId, workflow, submissionData, original?.id);
       const lockedErrors: Record<string, string> = {};
-      const error = formSubmissionError(workflow.fields, submissionData, member, lockedChecks, lockedErrors);
+      const error = formSubmissionError(workflow.fields, submissionData, formMember, lockedChecks, lockedErrors);
       if (error) {
         uniquenessFailure = { error, fieldErrors: lockedErrors };
         return null;
       }
+    }
+    if (original) {
+      const [updated] = await tx.update(requestsTable).set({
+        formData: submissionData,
+        fieldsSnapshot: snapshotReferenceFields(workflow.fields, submissionData),
+        stagesSnapshot: eligibleStages,
+        routingSnapshot: workflow.stages.map(stage => ({ ...stage, order: workflow.routing === "parallel" ? 1 : stage.order })),
+        status: "pending_approval", currentStage: 0, approvedStageIds: [],
+        assignedUserId: target.assignedUserId, assignedRoleId: target.assignedRoleId,
+        dueAt: new Date(createdAt.getTime() + dueHours * 60 * 60 * 1000),
+        updatedAt: createdAt,
+      }).where(and(eq(requestsTable.id, original.id), eq(requestsTable.tenantId, member.tenantId))).returning();
+      return updated;
     }
     const requestCode = await allocateRequestReference(tx, workflow.name, createdAt);
     const [request] = await tx
@@ -1584,6 +1658,7 @@ router.post("/requests", async (req, res): Promise<void> => {
         formData: submissionData,
         fieldsSnapshot: snapshotReferenceFields(workflow.fields, submissionData),
         stagesSnapshot: eligibleStages,
+        routingSnapshot: workflow.stages.map(stage => ({ ...stage, order: workflow.routing === "parallel" ? 1 : stage.order })),
         approvedStageIds: [],
         createdAt,
         updatedAt: createdAt,
@@ -1592,7 +1667,9 @@ router.post("/requests", async (req, res): Promise<void> => {
     return request;
   });
   if (!saved) {
-    res.status(400).json(uniquenessFailure);
+    res.status(correctionConflict ? 409 : 400).json(correctionConflict
+      ? { error: "This request changed while you were editing. Close and reopen the correction form." }
+      : uniquenessFailure);
     return;
   }
   const requestCode = saved.requestCode;
@@ -1602,13 +1679,14 @@ router.post("/requests", async (req, res): Promise<void> => {
     entityType: "request",
     entityId: String(saved.id),
     requestId: saved.id,
-    action: "Request submitted",
+    action: original ? "Request corrected and resubmitted — approval restarted" : "Request submitted",
+    comment: original ? correctionComment : undefined,
   });
   await addNotification({
     tenantId: member.tenantId,
     requestId: saved.id,
-    userIds: [member.id],
-    title: "Request submitted",
+    userIds: [original?.requesterId ?? member.id],
+    title: original ? "Request corrected and resubmitted" : "Request submitted",
     message: `${workflow.name} · ${requestCode}`,
     type: "status_change",
   });
@@ -1620,8 +1698,38 @@ router.post("/requests", async (req, res): Promise<void> => {
     "Approval task assigned",
     "task_assigned",
   );
-  const detail = await getRequestDetail(saved.id, member.tenantId);
-  res.status(201).json(CreateRequestResponse.parse(detail));
+  const detail = await getRequestDetail(saved.id, member.tenantId, member);
+  res.status(original ? 200 : 201).json(CreateRequestResponse.parse(detail));
+}
+
+router.post("/requests", submitRequest);
+router.post("/requests/:requestId/corrections", submitRequest);
+
+router.get("/requests/:requestId/edit-form", async (req, res): Promise<void> => {
+  const member = currentMember(res);
+  const params = GetRequestEditFormParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [request] = await db.select().from(requestsTable).where(and(
+    eq(requestsTable.id, params.data.requestId), eq(requestsTable.tenantId, member.tenantId),
+  )).limit(1);
+  if (!request) { res.status(404).json({ error: "Request not found." }); return; }
+  if (!canEditReturnedRequest(request, member)) {
+    res.status(403).json({ error: "Only the requester or a workspace admin can edit a returned request." });
+    return;
+  }
+  const context = await correctionContext(request, member);
+  if (!context) { res.status(409).json({ error: "The original workflow or requester is unavailable." }); return; }
+  res.json(GetRequestEditFormResponse.parse({
+    workflow: await workflowResponse(context.workflow),
+    formData: request.formData,
+    expressionUser: {
+      email: context.expressionMember.email, name: context.expressionMember.name, role: context.expressionMember.roleName,
+    },
+    updatedAt: request.updatedAt,
+  }));
 });
 
 router.get("/requests/:requestId", async (req, res): Promise<void> => {
@@ -1637,7 +1745,7 @@ router.get("/requests/:requestId", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Request not found." });
     return;
   }
-  const detail = await getRequestDetail(params.data.requestId, member.tenantId);
+  const detail = await getRequestDetail(params.data.requestId, member.tenantId, member);
   res.json(GetRequestResponse.parse(detail));
 });
 
@@ -1668,6 +1776,13 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
     return;
   }
   const { action, comment } = parsed.data;
+  const actionUpdatedAt = new Date(Math.max(Date.now(), request.updatedAt.getTime() + 1));
+  const actionGuard = and(
+    eq(requestsTable.id, request.id), eq(requestsTable.tenantId, member.tenantId),
+    eq(requestsTable.status, request.status),
+    // PostgreSQL defaults can include microseconds that JS Date cannot retain.
+    sql`date_trunc('milliseconds', ${requestsTable.updatedAt}) = ${request.updatedAt.toISOString()}::timestamptz`,
+  );
 
   if (action === "respond_clarification") {
     if (
@@ -1681,16 +1796,19 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
       return;
     }
     const active = currentStages(request);
-    const target = await assignedTarget(active, member.tenantId, null);
-    await db
+    const [requester] = await db.select({ managerId: usersTable.managerId }).from(usersTable)
+      .where(and(eq(usersTable.id, request.requesterId), eq(usersTable.tenantId, member.tenantId))).limit(1);
+    const target = await assignedTarget(active, member.tenantId, requester?.managerId ?? null);
+    const [changed] = await db
       .update(requestsTable)
       .set({
         status: "pending_approval",
         assignedUserId: target.assignedUserId,
         assignedRoleId: target.assignedRoleId,
-        updatedAt: new Date(),
+        updatedAt: actionUpdatedAt,
       })
-      .where(eq(requestsTable.id, request.id));
+      .where(actionGuard).returning({ id: requestsTable.id });
+    if (!changed) { res.status(409).json({ error: "The request changed. Refresh before trying again." }); return; }
     await recordAudit({
       tenantId: member.tenantId,
       actorUserId: member.id,
@@ -1719,29 +1837,30 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
       });
       return;
     }
-    await db
+    const [changed] = await db
       .update(requestsTable)
       .set({
         status: "needs_clarification",
         assignedUserId: request.requesterId,
         assignedRoleId: null,
-        updatedAt: new Date(),
+        updatedAt: actionUpdatedAt,
       })
-      .where(eq(requestsTable.id, request.id));
+      .where(actionGuard).returning({ id: requestsTable.id });
+    if (!changed) { res.status(409).json({ error: "The request changed. Refresh before trying again." }); return; }
     await recordAudit({
       tenantId: member.tenantId,
       actorUserId: member.id,
       entityType: "request",
       entityId: String(request.id),
       requestId: request.id,
-      action: "Clarification requested",
+      action: "Request sent back for correction",
       comment,
     });
     await addNotification({
       tenantId: member.tenantId,
       requestId: request.id,
       userIds: [request.requesterId],
-      title: "Clarification requested",
+      title: "Request sent back for correction",
       message: `${request.requestCode} · ${comment}`,
       type: "clarification",
     });
@@ -1754,15 +1873,16 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
       return;
     }
     if (action === "reject") {
-      await db
+      const [changed] = await db
         .update(requestsTable)
         .set({
           status: "rejected",
           assignedUserId: null,
           assignedRoleId: null,
-          updatedAt: new Date(),
+          updatedAt: actionUpdatedAt,
         })
-        .where(eq(requestsTable.id, request.id));
+        .where(actionGuard).returning({ id: requestsTable.id });
+      if (!changed) { res.status(409).json({ error: "The request changed. Refresh before trying again." }); return; }
       await recordAudit({
         tenantId: member.tenantId,
         actorUserId: member.id,
@@ -1815,7 +1935,7 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
       const dueHours = nextGroup.length
         ? Math.min(...nextGroup.map((stage) => stage.slaHours))
         : null;
-      await db
+      const [changed] = await db
         .update(requestsTable)
         .set({
           approvedStageIds: currentGroupComplete ? [] : approvedStageIds,
@@ -1833,9 +1953,10 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
               : finalStatus === "approved"
                 ? null
                 : request.dueAt,
-          updatedAt: new Date(),
+          updatedAt: actionUpdatedAt,
         })
-        .where(eq(requestsTable.id, request.id));
+        .where(actionGuard).returning({ id: requestsTable.id });
+      if (!changed) { res.status(409).json({ error: "The request changed. Refresh before trying again." }); return; }
       await recordAudit({
         tenantId: member.tenantId,
         actorUserId: member.id,
@@ -1871,7 +1992,7 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
     }
   }
 
-  const detail = await getRequestDetail(request.id, member.tenantId);
+  const detail = await getRequestDetail(request.id, member.tenantId, member);
   res.json(ActOnRequestResponse.parse(detail));
 });
 
