@@ -1,3 +1,4 @@
 - [FlowBuilder form scope](appsheet-form-scope.md) — builders are Admins + Developer role; keep AppSheet compatibility focused on user-entered forms.
 - [Signed-in UI verification](signed-in-ui-verification.md) — public screenshots cannot confirm editor fixes; verify the affected component's rendered output.
 - [Draft validation policy](draft-validation-policy.md) — allow unfinished drafts, but never relax publication checks when editing live forms.
+- [Reference data requirements](reference-data-requirements.md) — maintained tables must supply form choices, including onboarding branches.
