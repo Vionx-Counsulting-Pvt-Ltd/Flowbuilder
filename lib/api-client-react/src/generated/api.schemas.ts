@@ -251,6 +251,15 @@ export interface RequestActionInput {
   comment?: string | null;
 }
 
+export interface TenantBranding {
+  /** @nullable */
+  logoUrl: string | null;
+  /** @nullable */
+  primaryColor: string | null;
+  /** @nullable */
+  customDomain: string | null;
+}
+
 export interface CurrentUser {
   id: string;
   name: string;
@@ -260,6 +269,54 @@ export interface CurrentUser {
   tenantId: string;
   tenantName: string;
   permissions: string[];
+  isPlatformAdmin: boolean;
+  branding: TenantBranding;
+}
+
+export type PlatformPlan = typeof PlatformPlan[keyof typeof PlatformPlan];
+
+
+export const PlatformPlan = {
+  starter: 'starter',
+  professional: 'professional',
+  enterprise: 'enterprise',
+} as const;
+
+export interface PlatformTenant {
+  id: string;
+  name: string;
+  plan: PlatformPlan;
+  memberLimit: number;
+  requestLimit: number;
+  memberCount: number;
+  requestCount: number;
+  branding: TenantBranding;
+  createdAt: string;
+}
+
+export interface PlatformTenantInput {
+  /** @minLength 2 */
+  name: string;
+  /** @minLength 2 */
+  adminName: string;
+  adminEmail: string;
+  plan: PlatformPlan;
+  /** @minimum 1 */
+  memberLimit: number;
+  /** @minimum 1 */
+  requestLimit: number;
+  branding?: TenantBranding;
+}
+
+export interface PlatformTenantUpdate {
+  /** @minLength 2 */
+  name?: string;
+  plan?: PlatformPlan;
+  /** @minimum 1 */
+  memberLimit?: number;
+  /** @minimum 1 */
+  requestLimit?: number;
+  branding?: TenantBranding;
 }
 
 export interface DashboardTask {

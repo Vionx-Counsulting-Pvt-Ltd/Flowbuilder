@@ -28,7 +28,13 @@ export const GetCurrentUserResponse = zod.object({
   "roleName": zod.string(),
   "tenantId": zod.string(),
   "tenantName": zod.string(),
-  "permissions": zod.array(zod.string())
+  "permissions": zod.array(zod.string()),
+  "isPlatformAdmin": zod.boolean(),
+  "branding": zod.object({
+  "logoUrl": zod.string().nullable(),
+  "primaryColor": zod.string().nullable(),
+  "customDomain": zod.string().nullable()
+})
 })
 
 
@@ -1033,5 +1039,110 @@ export const GetStorageObjectParams = zod.object({
 })
 
 export const GetStorageObjectResponse = zod.unknown()
+
+
+/**
+ * @summary List tenant usage for platform administrators
+ */
+export const ListPlatformTenantsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "plan": zod.enum(['starter', 'professional', 'enterprise']),
+  "memberLimit": zod.number().int(),
+  "requestLimit": zod.number().int(),
+  "memberCount": zod.number().int(),
+  "requestCount": zod.number().int(),
+  "branding": zod.object({
+  "logoUrl": zod.string().nullable(),
+  "primaryColor": zod.string().nullable(),
+  "customDomain": zod.string().nullable()
+}),
+  "createdAt": zod.coerce.date()
+})
+export const ListPlatformTenantsResponse = zod.array(ListPlatformTenantsResponseItem)
+
+
+/**
+ * @summary Provision a tenant and invite its first company admin
+ */
+export const createPlatformTenantBodyNameMin = 2;
+
+export const createPlatformTenantBodyAdminNameMin = 2;
+
+
+
+
+
+export const CreatePlatformTenantBody = zod.object({
+  "name": zod.string().min(createPlatformTenantBodyNameMin),
+  "adminName": zod.string().min(createPlatformTenantBodyAdminNameMin),
+  "adminEmail": zod.string().email(),
+  "plan": zod.enum(['starter', 'professional', 'enterprise']),
+  "memberLimit": zod.number().int().min(1),
+  "requestLimit": zod.number().int().min(1),
+  "branding": zod.object({
+  "logoUrl": zod.string().nullable(),
+  "primaryColor": zod.string().nullable(),
+  "customDomain": zod.string().nullable()
+}).optional()
+})
+
+export const CreatePlatformTenantResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "plan": zod.enum(['starter', 'professional', 'enterprise']),
+  "memberLimit": zod.number().int(),
+  "requestLimit": zod.number().int(),
+  "memberCount": zod.number().int(),
+  "requestCount": zod.number().int(),
+  "branding": zod.object({
+  "logoUrl": zod.string().nullable(),
+  "primaryColor": zod.string().nullable(),
+  "customDomain": zod.string().nullable()
+}),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update tenant plan, limits, and white-label settings
+ */
+export const UpdatePlatformTenantParams = zod.object({
+  "tenantId": zod.coerce.string()
+})
+
+export const updatePlatformTenantBodyNameMin = 2;
+
+
+
+
+
+export const UpdatePlatformTenantBody = zod.object({
+  "name": zod.string().min(updatePlatformTenantBodyNameMin).optional(),
+  "plan": zod.enum(['starter', 'professional', 'enterprise']).optional(),
+  "memberLimit": zod.number().int().min(1).optional(),
+  "requestLimit": zod.number().int().min(1).optional(),
+  "branding": zod.object({
+  "logoUrl": zod.string().nullable(),
+  "primaryColor": zod.string().nullable(),
+  "customDomain": zod.string().nullable()
+}).optional()
+})
+
+export const UpdatePlatformTenantResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "plan": zod.enum(['starter', 'professional', 'enterprise']),
+  "memberLimit": zod.number().int(),
+  "requestLimit": zod.number().int(),
+  "memberCount": zod.number().int(),
+  "requestCount": zod.number().int(),
+  "branding": zod.object({
+  "logoUrl": zod.string().nullable(),
+  "primaryColor": zod.string().nullable(),
+  "customDomain": zod.string().nullable()
+}),
+  "createdAt": zod.coerce.date()
+})
 
 

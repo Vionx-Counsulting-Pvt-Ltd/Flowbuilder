@@ -26,6 +26,9 @@ import type {
   ListRequestsParams,
   Notification,
   PersonOption,
+  PlatformTenant,
+  PlatformTenantInput,
+  PlatformTenantUpdate,
   ReportOverview,
   RequestActionInput,
   RequestDetail,
@@ -1949,4 +1952,258 @@ export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorage
 
 
 
+
+export const getListPlatformTenantsUrl = () => {
+
+
+
+
+  return `/api/platform/tenants`
+}
+
+/**
+ * @summary List tenant usage for platform administrators
+ */
+export const listPlatformTenants = async ( options?: Parameters<typeof customFetch>[1]): Promise<PlatformTenant[]> => {
+
+  return customFetch<PlatformTenant[]>(getListPlatformTenantsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPlatformTenantsQueryKey = () => {
+    return [
+    `/api/platform/tenants`
+    ] as const;
+    }
+
+
+export const getListPlatformTenantsQueryOptions = <TData = Awaited<ReturnType<typeof listPlatformTenants>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformTenants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPlatformTenantsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPlatformTenants>>> = ({ signal }) => listPlatformTenants({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPlatformTenants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPlatformTenantsQueryResult = NonNullable<Awaited<ReturnType<typeof listPlatformTenants>>>
+export type ListPlatformTenantsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List tenant usage for platform administrators
+ */
+
+export function useListPlatformTenants<TData = Awaited<ReturnType<typeof listPlatformTenants>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformTenants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPlatformTenantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePlatformTenantUrl = () => {
+
+
+
+
+  return `/api/platform/tenants`
+}
+
+/**
+ * @summary Provision a tenant and invite its first company admin
+ */
+export const createPlatformTenant = async (platformTenantInput: PlatformTenantInput, options?: Parameters<typeof customFetch>[1]): Promise<PlatformTenant> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PlatformTenant>(getCreatePlatformTenantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(platformTenantInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePlatformTenantMutationKey = () => ['createPlatformTenant'] as const;
+
+export const getCreatePlatformTenantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlatformTenant>>, TError,CreatePlatformTenantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPlatformTenant>>, TError,CreatePlatformTenantMutationVariables, TContext> => {
+
+const mutationKey = getCreatePlatformTenantMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPlatformTenant>>, CreatePlatformTenantMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPlatformTenant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePlatformTenantMutationResult = NonNullable<Awaited<ReturnType<typeof createPlatformTenant>>>
+    export type CreatePlatformTenantMutationBody = BodyType<PlatformTenantInput>
+    export type CreatePlatformTenantMutationError = ErrorType<unknown>
+    export type CreatePlatformTenantMutationVariables = {data: BodyType<PlatformTenantInput>}
+
+    /**
+ * @summary Provision a tenant and invite its first company admin
+ */
+export const useCreatePlatformTenant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlatformTenant>>, TError,CreatePlatformTenantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPlatformTenant>>,
+        TError,
+        CreatePlatformTenantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePlatformTenantMutationOptions(options));
+    }
+
+export const getUpdatePlatformTenantUrl = (tenantId: string,) => {
+
+
+
+
+  return `/api/platform/tenants/${tenantId}`
+}
+
+/**
+ * @summary Update tenant plan, limits, and white-label settings
+ */
+export const updatePlatformTenant = async (tenantId: string,
+    platformTenantUpdate: PlatformTenantUpdate, options?: Parameters<typeof customFetch>[1]): Promise<PlatformTenant> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PlatformTenant>(getUpdatePlatformTenantUrl(tenantId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(platformTenantUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdatePlatformTenantMutationKey = () => ['updatePlatformTenant'] as const;
+
+export const getUpdatePlatformTenantMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlatformTenant>>, TError,UpdatePlatformTenantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePlatformTenant>>, TError,UpdatePlatformTenantMutationVariables, TContext> => {
+
+const mutationKey = getUpdatePlatformTenantMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePlatformTenant>>, UpdatePlatformTenantMutationVariables> = (props) => {
+          const {tenantId,data} = props ?? {};
+
+          return  updatePlatformTenant(tenantId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePlatformTenantMutationResult = NonNullable<Awaited<ReturnType<typeof updatePlatformTenant>>>
+    export type UpdatePlatformTenantMutationBody = BodyType<PlatformTenantUpdate>
+    export type UpdatePlatformTenantMutationError = ErrorType<void>
+    export type UpdatePlatformTenantMutationVariables = {tenantId: string;data: BodyType<PlatformTenantUpdate>}
+
+    /**
+ * @summary Update tenant plan, limits, and white-label settings
+ */
+export const useUpdatePlatformTenant = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlatformTenant>>, TError,UpdatePlatformTenantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePlatformTenant>>,
+        TError,
+        UpdatePlatformTenantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdatePlatformTenantMutationOptions(options));
+    }
 

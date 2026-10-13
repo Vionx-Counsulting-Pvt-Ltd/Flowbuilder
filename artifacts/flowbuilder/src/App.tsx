@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { ClerkProvider, Show, SignIn as ClerkSignInView, SignUp as ClerkSignUpView, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import {
-  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, Check, CheckCircle2, ChevronDown, ChevronLeft,
+  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, Building2, Check, CheckCircle2, ChevronDown, ChevronLeft,
   ChevronRight, CircleHelp, Clock3, FileCheck2, Filter, GitBranch, LayoutDashboard,
-  ListChecks, Menu, MoreHorizontal, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles,
+  Copy, Download, ListChecks, Menu, MoreHorizontal, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles,
   Users, Workflow as WorkflowIcon, X, XCircle, Zap,
 } from 'lucide-react';
 import {
@@ -24,7 +24,8 @@ import type {
 } from '@workspace/api-client-react';
 import WorkflowEditor from './WorkflowEditor';
 import RequestFormModal from './components/RequestFormModal';
-
+import BulkUserImport from './BulkUserImport';
+import PlatformAdminPage from './PlatformAdminPage';
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
@@ -83,6 +84,24 @@ function timeAgo(value: string) {
   const hours = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 3_600_000));
   return hours < 1 ? 'Just now' : hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
 }
+
+function hexToHsl(hex: string) {
+  const normalized = hex.replace('#', '');
+  const red = parseInt(normalized.slice(0, 2), 16) / 255;
+  const green = parseInt(normalized.slice(2, 4), 16) / 255;
+  const blue = parseInt(normalized.slice(4, 6), 16) / 255;
+  const max = Math.max(red, green, blue); const min = Math.min(red, green, blue);
+  const delta = max - min; let hue = 0;
+  if (delta) {
+    if (max === red) hue = ((green - blue) / delta) % 6;
+    else if (max === green) hue = (blue - red) / delta + 2;
+    else hue = (red - green) / delta + 4;
+  }
+  hue = Math.round(hue * 60); if (hue < 0) hue += 360;
+  const lightness = (max + min) / 2;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+  return `${hue} ${Math.round(saturation * 100)}% ${Math.round(lightness * 100)}%`;
+}
 function StatusPill({ status }: { status: string }) {
   const label = status.replaceAll('_', ' ');
   return <span className={`status-pill status-${status}`}>{label}</span>;
@@ -127,6 +146,7 @@ const nav = [
   { href: '/requests', label: 'Requests', icon: ListChecks },
   { href: '/team', label: 'Team', icon: Users },
   { href: '/reports', label: 'Reports', icon: Activity },
+  { href: '/platform', label: 'Platform tenants', icon: Building2 },
 ];
 function HomeRedirect() {
   return <><Show when="signed-in"><Redirect to="/dashboard" /></Show><Show when="signed-out"><Landing /></Show></>;
@@ -159,12 +179,20 @@ function AppFrame() {
   const visibleNav = nav.filter(item => {
     if (item.href === '/team') return current.data?.permissions.includes('admin') ?? false;
     if (item.href === '/reports') return Boolean(current.data?.permissions.includes('report') || current.data?.permissions.includes('admin'));
+    if (item.href === '/platform') return current.data?.isPlatformAdmin ?? false;
     return true;
   });
   const activeNav = visibleNav.find(item => location.startsWith(item.href))?.href || '/dashboard';
-  return <div className="app-shell flex">
+  const tenantColor = current.data?.branding.primaryColor;
+  const themeStyle = tenantColor ? ({
+    '--primary': hexToHsl(tenantColor),
+    '--ring': hexToHsl(tenantColor),
+    '--sidebar-primary': hexToHsl(tenantColor),
+    '--chart-1': hexToHsl(tenantColor),
+  } as CSSProperties) : undefined;
+  return <div className="app-shell flex" style={themeStyle}>
     <aside className={cx('sidebar fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col transition-transform md:translate-x-0', mobileNav ? 'translate-x-0' : '-translate-x-full')}>
-      <Link href="/dashboard" className="sidebar-brand"><img src={`${basePath}/logo.svg`} alt="" /><span>flowbuilder</span><span className="workspace-label">WORKSPACE</span></Link>
+      <Link href="/dashboard" className="sidebar-brand"><img src={current.data?.branding.logoUrl || `${basePath}/logo.svg`} alt={current.data?.tenantName ? `${current.data.tenantName} logo` : ''} /><span>flowbuilder</span><span className="workspace-label">WORKSPACE</span></Link>
       <div className="sidebar-workspace"><span className="workspace-monogram">{initials(current.data?.tenantName).slice(0, 1)}</span><div><b>{current.data?.tenantName || 'Your workspace'}</b><small>Operations team</small></div><ChevronDown size={15} /></div>
        <span className="sidebar-caption">WORKSPACE</span><nav className="sidebar-nav">{visibleNav.map(item => <Link key={item.href} href={item.href} onClick={() => setMobileNav(false)} className={cx('nav-link', activeNav === item.href && 'active')}><item.icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.href === '/requests' && <span className="nav-count">{notificationCount ? Math.min(notificationCount, 9) : ''}</span>}</Link>)}</nav>
       <div className="sidebar-bottom"><div className="sidebar-tip"><Sparkles size={16} /><span>Small steps, clear owners.<br />That’s how good work gets done.</span></div><div className="user-menu"><div className="avatar">{initials(current.data?.name)}</div><div className="user-copy"><b>{current.data?.name || 'Loading profile'}</b><small>{current.data?.roleName || 'Workspace member'}</small></div><button className="user-signout" onClick={() => window.dispatchEvent(new Event('flowbuilder:signout'))} aria-label="Account options"><MoreHorizontal size={17} /></button></div></div>
@@ -181,6 +209,7 @@ function AppFrame() {
         <Route path="/requests/:requestId" component={RequestDetailPage} />
         <Route path="/team" component={TeamPage} />
         <Route path="/reports" component={ReportsPage} />
+         <Route path="/platform" component={PlatformAdminRoute} />
         <Route path="/notifications" component={NotificationsPage} />
         <Route component={NotFoundPage} />
       </Switch></div>
@@ -205,6 +234,15 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 function ProtectedFrame() { return <><Show when="signed-in"><AccountSignOutListener /><AppFrame /></Show><Show when="signed-out"><Redirect to="/" /></Show></>; }
+
+function PlatformAdminRoute() {
+  const current = useGetCurrentUser();
+  return <LoadState loading={current.isLoading} error={current.isError} retry={() => void current.refetch()}>
+    {current.data?.isPlatformAdmin
+      ? <PlatformAdminPage />
+      : <PageHeading eyebrow="PLATFORM ACCESS" title="Platform owner access required" description="This console is restricted to users marked as platform administrators in Clerk." />}
+  </LoadState>;
+}
 function AuthPage({ mode }: { mode: 'in' | 'up' }) { return mode === 'in' ? <SignInPage /> : <SignupPage />; }
 function Router() {
   const [, setLocation] = useLocation();
@@ -296,24 +334,53 @@ function WorkflowModal({ workflow, onClose }: { workflow?: Workflow; onClose: ()
   </form></Modal>;
 }
 function WorkflowsPage() {
-  const qc = useQueryClient(); const query = useListWorkflows(); const update = useUpdateWorkflow(); const current = useGetCurrentUser();
+  const qc = useQueryClient(); const query = useListWorkflows(); const update = useUpdateWorkflow(); const create = useCreateWorkflow(); const current = useGetCurrentUser(); const roles = useListRoles();
   const canBuild = Boolean(current.data?.permissions.includes('build') || current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner');
-  const [search, setSearch] = useState(''); const [tab, setTab] = useState('All');
+  const [search, setSearch] = useState(''); const [tab, setTab] = useState('All'); const [templateRole, setTemplateRole] = useState(''); const [createMessage, setCreateMessage] = useState('');
   const rows = query.data?.filter(w => (tab === 'All' || w.status === tab.toLowerCase()) && `${w.name} ${w.category} ${w.description}`.toLowerCase().includes(search.toLowerCase())) || [];
   function openEditor(workflowId?: string) { window.open(`${basePath}${workflowId ? `/workflows/${workflowId}/edit` : '/workflows/new'}`, '_blank', 'noopener,noreferrer'); }
   function changeStatus(wf: Workflow) { update.mutate({ workflowId: wf.id, data: { status: wf.status === 'active' ? 'inactive' : 'active' } }, { onSuccess: () => invalidate(qc, [getListWorkflowsQueryKey(), getGetWorkflowQueryKey(wf.id)]) }); }
+  const role = roles.data?.find(item => item.id === templateRole) || roles.data?.find(item => item.name.toLowerCase() === 'approver') || roles.data?.find(item => item.memberCount > 0) || roles.data?.[0];
+  const templateSpecs = [
+    { name: 'Expense reimbursement', category: 'Finance', description: 'Capture an employee expense and route it for review before reimbursement.', routing: 'sequential' as const, fields: [['Expense description', 'text'], ['Amount', 'number'], ['Expense date', 'date'], ['Business purpose', 'textarea']] as const, stage: 'Finance review' },
+    { name: 'Purchase request', category: 'Procurement', description: 'Collect purchase details and assign a clear owner for approval.', routing: 'sequential' as const, fields: [['Item or service', 'text'], ['Estimated cost', 'number'], ['Needed by', 'date'], ['Business justification', 'textarea']] as const, stage: 'Purchase approval' },
+    { name: 'System access request', category: 'IT', description: 'Record the requested system, access level, and business reason.', routing: 'parallel' as const, fields: [['System name', 'text'], ['Access level', 'select'], ['Requested start date', 'date'], ['Business justification', 'textarea']] as const, stage: 'Access review' },
+  ];
+  function createFromTemplate(spec: typeof templateSpecs[number]) {
+    if (!role) return;
+    const fields: WorkflowField[] = spec.fields.map(([label, type]) => ({
+      id: crypto.randomUUID(), label, type: type as WorkflowField['type'], required: true,
+      ...(type === 'select' ? { options: ['Read only', 'Standard', 'Administrator'] } : {}),
+    }));
+    const stage: WorkflowStage = { id: crypto.randomUUID(), name: spec.stage, order: 1, assigneeType: 'role', assigneeId: role.id, assigneeLabel: role.name, slaHours: 48 };
+    create.mutate({ data: { name: spec.name, category: spec.category, description: spec.description, routing: spec.routing, fields, stages: [stage] } }, {
+      onSuccess: () => { invalidate(qc, [getListWorkflowsQueryKey(), getGetDashboardQueryKey()]); setCreateMessage(`${spec.name} added as a draft. Edit it to fit your workspace.`); },
+      onError: () => setCreateMessage(`Could not create ${spec.name}. Please try again.`),
+    });
+  }
+  function duplicateWorkflow(wf: Workflow) {
+    const fieldIds = new Map(wf.fields.map(field => [field.id, crypto.randomUUID()]));
+    const fields = wf.fields.map(field => ({ ...field, id: fieldIds.get(field.id)! }));
+    const stages = wf.stages.map((stage, index) => ({
+      ...stage, id: crypto.randomUUID(), order: index + 1,
+      conditionFieldId: stage.conditionFieldId ? fieldIds.get(stage.conditionFieldId) || null : null,
+    }));
+    create.mutate({ data: { name: `Copy of ${wf.name}`, category: wf.category, description: wf.description, routing: wf.routing, fields, stages } }, {
+      onSuccess: () => { invalidate(qc, [getListWorkflowsQueryKey(), getGetDashboardQueryKey()]); setCreateMessage(`Copy of ${wf.name} saved as a draft.`); },
+      onError: () => setCreateMessage(`Could not duplicate ${wf.name}. Please try again.`),
+    });
+  }
   return <><PageHeading eyebrow="THE SYSTEMS YOUR TEAM RUNS ON" title="Workflows" description="Build a reliable path for recurring work. Make the next handoff obvious." action={canBuild && <Button onClick={() => openEditor()} data-testid="button-new-workflow"><Plus size={16} /> New workflow</Button>} />
+     {canBuild && <section className="surface mb-5 p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><span className="section-label">GET A HEAD START</span><h2 className="display mt-1 text-xl font-bold">Workflow templates</h2><p className="mt-1 text-sm text-muted-foreground">Start with a useful draft, then tailor fields and routing to your team.</p></div><label className="form-field min-w-48"><span>Default approver role</span><SelectInput value={role?.id || ''} onChange={e => setTemplateRole(e.target.value)}><option value="">Choose a role</option>{roles.data?.map(item => <option key={item.id} value={item.id}>{item.name}{item.memberCount ? ` · ${item.memberCount}` : ''}</option>)}</SelectInput></label></div>
+       {createMessage && <p className="mt-3 text-xs text-primary" role="status">{createMessage}</p>}
+       <div className="mt-4 grid gap-3 md:grid-cols-3">{templateSpecs.map(spec => <article key={spec.name} className="rounded-xl border border-border bg-background p-4 transition hover:-translate-y-0.5 hover:shadow-sm"><div className="flex items-center justify-between"><span className="workflow-glyph"><GitBranch size={17} /></span><span className="status-pill status-draft">DRAFT</span></div><h3 className="mt-3 font-semibold">{spec.name}</h3><p className="mt-1 min-h-10 text-xs leading-5 text-muted-foreground">{spec.description}</p><div className="mt-3 flex items-center justify-between"><small className="text-muted-foreground">{spec.category} · {spec.fields.length} fields</small><Button variant="outline" disabled={!role || create.isPending} onClick={() => createFromTemplate(spec)}>{create.isPending ? 'Adding…' : 'Use template'} <ArrowRight size={13} /></Button></div></article>)}</div>
+       {!roles.isLoading && !roles.data?.length && <p className="mt-3 text-xs text-muted-foreground">Create a workspace role before using templates.</p>}
+     </section>}
     <div className="workflow-toolbar"><div className="tabs">{['All', 'Active', 'Draft', 'Inactive'].map(t => <button key={t} className={tab === t ? 'selected' : ''} onClick={() => setTab(t)}>{t}<span>{t === 'All' ? query.data?.length || 0 : query.data?.filter(w => w.status === t.toLowerCase()).length || 0}</span></button>)}</div><label className="searchbox"><Search size={16} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search workflows" aria-label="Search workflows" /></label></div>
-     <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}>{rows.length ? <div className="workflow-grid">{rows.map((wf, index) => <article className={`workflow-card surface enter enter-delay-${Math.min(index % 3 + 1, 3)}`} key={wf.id}><div className="workflow-card-head"><span className="workflow-glyph"><GitBranch size={18} /></span><StatusPill status={wf.status} />{canBuild && <button className="card-menu" aria-label={`Edit ${wf.name}`} onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-menu-${wf.id}`}><MoreHorizontal size={18} /></button>}</div><div className="workflow-category">{wf.category} <span>·</span> v{wf.version}</div><h2>{wf.name}</h2><p>{wf.description || 'A clear path for this kind of request.'}</p><div className="workflow-route">{wf.stages.slice(0, 3).map((stage, i) => <span key={stage.id}><i className={i === 0 ? 'route-start' : ''} />{stage.name}</span>)}{wf.stages.length > 3 && <small>+{wf.stages.length - 3}</small>}</div><div className="workflow-card-foot"><span><Users size={14} /> {wf.ownerName}</span><span><FileCheck2 size={14} /> {wf.requestCount} requests</span></div>{canBuild && <div className="workflow-actions"><Button variant="outline" className="flex-1" onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-${wf.id}`}><Settings2 size={15} /> Edit workflow</Button><Button variant={wf.status === 'active' ? 'quiet' : 'outline'} className="min-w-24" disabled={update.isPending} onClick={() => changeStatus(wf)}>{wf.status === 'active' ? 'Pause' : 'Publish'}</Button></div>}</article>)}</div> : <EmptyState title={search ? 'No workflows found' : 'Start with one clear path'} body={search ? 'Try a different name or category.' : 'Create the first workflow your team can rely on. Add request fields, owners, and approval stages as you go.'} action={!search && canBuild && <Button onClick={() => openEditor()} data-testid="button-create-first-workflow"><Plus size={15} /> Create a workflow</Button>} />}</LoadState>
+      <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}>{rows.length ? <div className="workflow-grid">{rows.map((wf, index) => <article className={`workflow-card surface enter enter-delay-${Math.min(index % 3 + 1, 3)}`} key={wf.id}><div className="workflow-card-head"><span className="workflow-glyph"><GitBranch size={18} /></span><StatusPill status={wf.status} />{canBuild && <button className="card-menu" aria-label={`Edit ${wf.name}`} onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-menu-${wf.id}`}><MoreHorizontal size={18} /></button>}</div><div className="workflow-category">{wf.category} <span>·</span> v{wf.version}</div><h2>{wf.name}</h2><p>{wf.description || 'A clear path for this kind of request.'}</p><div className="workflow-route">{wf.stages.slice(0, 3).map((stage, i) => <span key={stage.id}><i className={i === 0 ? 'route-start' : ''} />{stage.name}</span>)}{wf.stages.length > 3 && <small>+{wf.stages.length - 3}</small>}</div><div className="workflow-card-foot"><span><Users size={14} /> {wf.ownerName}</span><span><FileCheck2 size={14} /> {wf.requestCount} requests</span></div>{canBuild && <div className="workflow-actions"><Button variant="outline" className="flex-1" onClick={() => openEditor(wf.id)} data-testid={`button-edit-workflow-${wf.id}`}><Settings2 size={15} /> Edit workflow</Button><Button variant="outline" title="Create a new draft from this workflow" onClick={() => duplicateWorkflow(wf)} disabled={create.isPending}><Copy size={15} /> Copy</Button><Button variant={wf.status === 'active' ? 'quiet' : 'outline'} className="min-w-24" disabled={update.isPending} onClick={() => changeStatus(wf)}>{wf.status === 'active' ? 'Pause' : 'Publish'}</Button></div>}</article>)}</div> : <EmptyState title={search ? 'No workflows found' : 'Start with one clear path'} body={search ? 'Try a different name or category.' : 'Create the first workflow your team can rely on. Add request fields, owners, and approval stages as you go.'} action={!search && canBuild && <Button onClick={() => openEditor()} data-testid="button-create-first-workflow"><Plus size={15} /> Create a workflow</Button>} />}</LoadState>
   </>;
 }
 
-function LegacyRequestCreateModal({ workflows, onClose }: { workflows: Workflow[]; onClose: () => void }) {
-  const qc = useQueryClient(); const create = useCreateRequest(); const [, setLocation] = useLocation(); const [workflowId, setWorkflowId] = useState(workflows.find(w => w.status === 'active')?.id || '');
-  const selected = workflows.find(w => w.id === workflowId); const [values, setValues] = useState<Record<string, unknown>>({});
-  function submit(e: FormEvent) { e.preventDefault(); if (!selected) return; create.mutate({ data: { workflowId, formData: values } }, { onSuccess: request => { invalidate(qc, [getListRequestsQueryKey(), getGetDashboardQueryKey(), getGetReportOverviewQueryKey()]); onClose(); setLocation(`/requests/${request.id}`); } }); }
-  return <Modal title="Start a request" subtitle="Choose a workflow, then share the context your approvers need." onClose={onClose}><form onSubmit={submit} className="space-y-4"><Field label="Workflow"><SelectInput value={workflowId} onChange={e => { setWorkflowId(e.target.value); setValues({}); }} required><option value="">Choose a workflow</option>{workflows.filter(w => w.status === 'active').map(w => <option key={w.id} value={w.id}>{w.name} · {w.category}</option>)}</SelectInput></Field>{selected?.fields.map(field => <Field key={field.id} label={`${field.label}${field.required ? ' *' : ''}`}>{field.type === 'textarea' ? <TextArea required={field.required} value={String(values[field.id] ?? '')} placeholder={field.placeholder || ''} onChange={e => setValues(v => ({ ...v, [field.id]: e.target.value }))} /> : field.type === 'checkbox' ? <input type="checkbox" checked={Boolean(values[field.id])} onChange={e => setValues(v => ({ ...v, [field.id]: e.target.checked }))} /> : field.type === 'select' ? <SelectInput required={field.required} value={String(values[field.id] ?? '')} onChange={e => setValues(v => ({ ...v, [field.id]: e.target.value }))}><option value="">Choose an option</option>{field.options?.map(option => <option key={option} value={option}>{option}</option>)}</SelectInput> : <TextInput type={field.type === 'number' || field.type === 'date' ? field.type : 'text'} required={field.required} value={String(values[field.id] ?? '')} placeholder={field.placeholder || ''} onChange={e => setValues(v => ({ ...v, [field.id]: e.target.value }))} />}</Field>)}{!selected && <EmptyState title="Choose a workflow to begin" body={workflows.length ? 'Select an active workflow above to see its form.' : 'There are no active workflows yet. Ask a workspace admin to publish one.'} />}{create.isError && <p className="form-error">Couldn’t submit this request. Please try again.</p>}<div className="modal-actions"><Button type="button" variant="quiet" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!selected || create.isPending}>{create.isPending ? 'Submitting…' : 'Submit request'} <ArrowRight size={15} /></Button></div></form></Modal>;
-}
 function RequestsPage() {
   const qc = useQueryClient(); const workflows = useListWorkflows(); const current = useGetCurrentUser(); const [status, setStatus] = useState('All statuses'); const [search, setSearch] = useState(''); const [create, setCreate] = useState(false);
   const params = useMemo(() => ({ ...(status !== 'All statuses' ? { status: status.replaceAll(' ', '_') as RequestStatus } : {}), ...(search.trim() ? { search: search.trim() } : {}) }), [status, search]);
@@ -358,14 +425,15 @@ function RequestDetailPage() {
 
 function TeamPage() {
   const current = useGetCurrentUser(); const qc = useQueryClient(); const users = useListUsers(); const roles = useListRoles(); const invite = useCreateUser(); const updateUser = useUpdateUser(); const createRole = useCreateRole(); const updateRole = useUpdateRole();
-  const [inviteOpen, setInviteOpen] = useState(false); const [roleOpen, setRoleOpen] = useState(false); const [tab, setTab] = useState<'Members' | 'Roles'>('Members'); const [editingRole, setEditingRole] = useState<WorkspaceRole | undefined>(); const [search, setSearch] = useState('');
+  const [inviteOpen, setInviteOpen] = useState(false); const [importOpen, setImportOpen] = useState(false); const [roleOpen, setRoleOpen] = useState(false); const [tab, setTab] = useState<'Members' | 'Roles'>('Members'); const [editingRole, setEditingRole] = useState<WorkspaceRole | undefined>(); const [search, setSearch] = useState('');
   const members = users.data?.filter(u => `${u.name} ${u.email} ${u.roleName}`.toLowerCase().includes(search.toLowerCase())) || [];
   if (current.data && !current.data.permissions.includes('admin')) return <PageHeading eyebrow="WORKSPACE ACCESS" title="Team settings are restricted" description="Only workspace administrators can manage members and roles." />;
-  return <><PageHeading eyebrow="PEOPLE, PERMISSIONS, OWNERSHIP" title="Your team" description="Set clear responsibility for the work moving through your workspace." action={<Button onClick={() => setInviteOpen(true)}><Plus size={16} /> Invite a teammate</Button>} />
+  return <><PageHeading eyebrow="PEOPLE, PERMISSIONS, OWNERSHIP" title="Your team" description="Set clear responsibility for the work moving through your workspace." action={<>{tab === 'Members' && <Button variant="outline" onClick={() => setImportOpen(true)}><FileCheck2 size={15} /> Import CSV</Button>}<Button onClick={() => setInviteOpen(true)}><Plus size={16} /> Invite a teammate</Button></>} />
     <div className="team-stats"><div><Users size={17} /><b>{users.data?.length || 0}</b><span>members</span></div><div><ShieldCheck size={17} /><b>{roles.data?.length || 0}</b><span>workspace roles</span></div><div><Activity size={17} /><b>{users.data?.filter(user => user.status === 'active').length || 0}</b><span>active today</span></div></div>
     <div className="team-toolbar"><div className="tabs"><button className={tab === 'Members' ? 'selected' : ''} onClick={() => setTab('Members')}>Members</button><button className={tab === 'Roles' ? 'selected' : ''} onClick={() => setTab('Roles')}>Roles & permissions</button></div>{tab === 'Members' && <label className="searchbox"><Search size={16} /><input aria-label="Search team" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people" /></label>}{tab === 'Roles' && <Button variant="outline" onClick={() => { setEditingRole(undefined); setRoleOpen(true); }}><Plus size={15} /> New role</Button>}</div>
     {tab === 'Members' ? <LoadState loading={users.isLoading || roles.isLoading} error={users.isError || roles.isError} retry={() => { void users.refetch(); void roles.refetch(); }}>{members.length ? <section className="surface">{updateUser.isError && <p className="form-error px-5 pt-4" role="alert">Couldn’t update this teammate. Check the role or status and try again.</p>}<div className="overflow-x-auto"><table className="data-table"><thead><tr><th>TEAM MEMBER</th><th>ROLE</th><th>MANAGER</th><th>STATUS</th><th>JOINED</th><th /></tr></thead><tbody>{members.map(member => <tr key={member.id} data-testid={`team-member-${member.id}`}><td><div className="member-cell"><span className="avatar">{initials(member.name)}</span><span><b>{member.name}</b><small>{member.email}</small></span></div></td><td><SelectInput aria-label={`Update role for ${member.name}`} className="member-action" value={member.roleId} disabled={updateUser.isPending} onChange={e => updateUser.mutate({ userId: member.id, data: { roleId: e.target.value } }, { onSuccess: () => invalidate(qc, [getListUsersQueryKey(), getListRolesQueryKey()]) })}>{roles.data?.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</SelectInput></td><td>{users.data?.find(u => u.id === member.managerId)?.name || '—'}</td><td><StatusPill status={member.status} /></td><td>{formatDate(member.createdAt, { month: 'short', year: 'numeric' })}</td><td><SelectInput aria-label={`Update status for ${member.name}`} className="member-action" value={member.status === 'inactive' ? 'inactive' : 'active'} disabled={updateUser.isPending} onChange={e => updateUser.mutate({ userId: member.id, data: { status: e.target.value as 'active' | 'inactive' } }, { onSuccess: () => invalidate(qc, [getListUsersQueryKey(), getListRolesQueryKey()]) })}><option value="active">Active</option><option value="inactive">Deactivate</option></SelectInput></td></tr>)}</tbody></table></div></section> : <EmptyState title="No teammates match" body={search ? 'Try a different name or email.' : 'Invite your teammates to give every handoff a real owner.'} action={!search && <Button onClick={() => setInviteOpen(true)}><Plus size={15} /> Invite a teammate</Button>} />}</LoadState> : <LoadState loading={roles.isLoading} error={roles.isError} retry={() => void roles.refetch()}>{roles.data?.length ? <div className="role-grid">{roles.data.map(role => <article className="surface role-card" key={role.id}><div className="role-card-head"><span className="role-badge"><ShieldCheck size={18} /></span><button className="card-menu" aria-label={`Edit ${role.name}`} onClick={() => { setEditingRole(role); setRoleOpen(true); }}><MoreHorizontal size={18} /></button></div><h2>{role.name}</h2><p>{role.description}</p><div className="permission-chips">{role.permissions.map(permission => <span key={permission}>{permission}</span>)}</div><div className="role-foot"><span>{role.memberCount} members</span>{role.isDefault && <span className="default-role">Default role</span>}</div></article>)}</div> : <EmptyState title="No roles configured" body="Create a role to shape what members can see and do." action={<Button onClick={() => setRoleOpen(true)}><Plus size={15} /> Create role</Button>} />}</LoadState>}
     {inviteOpen && <InviteModal roles={roles.data || []} members={users.data || []} busy={invite.isPending} error={invite.isError} onClose={() => setInviteOpen(false)} onSubmit={data => invite.mutate({ data }, { onSuccess: () => { invalidate(qc, [getListUsersQueryKey(), getListRolesQueryKey()]); setInviteOpen(false); } })} />}
+     {importOpen && <BulkUserImport roles={roles.data || []} members={users.data || []} onClose={() => setImportOpen(false)} onImported={() => invalidate(qc, [getListUsersQueryKey(), getListRolesQueryKey()])} />}
     {roleOpen && <RoleModal role={editingRole} busy={createRole.isPending || updateRole.isPending} error={createRole.isError || updateRole.isError} onClose={() => setRoleOpen(false)} onSubmit={data => { const onSuccess = () => { invalidate(qc, [getListRolesQueryKey(), getListUsersQueryKey()]); setRoleOpen(false); }; if (editingRole) updateRole.mutate({ roleId: editingRole.id, data }, { onSuccess }); else createRole.mutate({ data }, { onSuccess }); }} />}
   </>;
 }
@@ -384,7 +452,33 @@ function ReportsPage() {
   if (current.data && !current.data.permissions.includes('report') && !current.data.permissions.includes('admin')) return <PageHeading eyebrow="WORKSPACE ACCESS" title="Reports are restricted" description="Your workspace role does not include report access." />;
   const maxVolume = Math.max(1, ...(report?.weeklyVolume.map(item => item.count) || [1]));
   const maxWork = Math.max(1, ...(report?.workload.map(item => item.pending + item.completed) || [1]));
-  return <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}><><PageHeading eyebrow="THE SHAPE OF WORK" title="Reports" description="Spot the bottlenecks, understand the load, and make a more thoughtful process." action={<span className="report-period"><SlidersHorizontal size={15} /> Last 7 days</span>} />
+  function downloadCsv() {
+    if (!report) return;
+    const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+    const rows = [
+      ['Section', 'Metric', 'Value'],
+      ['Summary', 'Total requests', report.totalRequests],
+      ['Summary', 'In progress', report.pendingRequests],
+      ['Summary', 'Average turnaround hours', report.averageTurnaroundHours],
+      ['Summary', 'Approval rate percent', report.approvalRate],
+      [],
+      ['Daily request volume'],
+      ['Day', 'Requests'],
+      ...report.weeklyVolume.map(item => [item.label, item.count]),
+      [],
+      ['Approver workload'],
+      ['Person', 'Pending', 'Completed'],
+      ...report.workload.map(person => [person.name, person.pending, person.completed]),
+    ];
+    const contents = rows.map(row => row.map(value => quote(value ?? '')).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${contents}`], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `flowbuilder-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+  return <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}><><PageHeading eyebrow="THE SHAPE OF WORK" title="Reports" description="Spot the bottlenecks, understand the load, and make a more thoughtful process." action={<div className="flex flex-wrap items-center gap-2"><span className="report-period"><SlidersHorizontal size={15} /> Last 7 days</span><Button variant="outline" disabled={!report} onClick={downloadCsv}><Download size={15} /> Download CSV</Button></div>} />
     <div className="report-kpis"><div className="surface report-kpi"><span>TOTAL REQUESTS</span><b>{report?.totalRequests ?? 0}</b><small><span className="trend-good"><ArrowUpRight size={14} /></span> Across all workflows</small></div><div className="surface report-kpi"><span>IN PROGRESS</span><b>{report?.pendingRequests ?? 0}</b><small>Requests waiting on a decision</small></div><div className="surface report-kpi"><span>AVG. TURNAROUND</span><b>{report?.averageTurnaroundHours ?? 0}<small> hrs</small></b><small>From submission to final decision</small></div><div className="surface report-kpi"><span>APPROVAL RATE</span><b>{report?.approvalRate ?? 0}<small>%</small></b><small>Requests approved this period</small></div></div>
     <div className="report-grid"><section className="surface chart-panel"><div className="panel-heading"><div><h2>Request volume</h2><p>Requests submitted, grouped by day.</p></div><span className="chart-legend"><i /> Requests</span></div><div className="volume-chart"><div className="chart-y">{[maxVolume, Math.round(maxVolume * .66), Math.round(maxVolume * .33), 0].map((n, i) => <span key={i}>{n}</span>)}</div><div className="chart-bars">{report?.weeklyVolume.map((item, i) => <div className="chart-column" key={`${item.label}-${i}`}><span className="bar-value">{item.count}</span><div className="bar-track"><i style={{ height: `${Math.max(4, item.count / maxVolume * 100)}%` }} /></div><small>{item.label}</small></div>)}</div></div></section>
       <section className="surface chart-panel workload-panel"><div className="panel-heading"><div><h2>Approver workload</h2><p>Current queue alongside completed work.</p></div></div>{report?.workload.length ? <div className="workload-list">{report.workload.map(person => <div className="workload-row" key={person.name}><span className="avatar">{initials(person.name)}</span><div className="workload-person"><b>{person.name}</b><div className="workload-bar"><i style={{ width: `${person.pending / maxWork * 100}%` }} /><i style={{ width: `${person.completed / maxWork * 100}%` }} /></div></div><span className="work-count"><b>{person.pending}</b><small> pending</small></span></div>)}</div> : <EmptyState title="No workload data" body="Approver activity will appear as requests move through the workspace." />}<div className="workload-legend"><span><i className="pending-key" /> Pending</span><span><i className="complete-key" /> Completed</span></div></section></div>

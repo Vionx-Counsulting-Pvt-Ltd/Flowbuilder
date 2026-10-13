@@ -5,6 +5,7 @@
  * FlowBuilder workflow, request, team, and reporting API
  * OpenAPI spec version: 0.2.0
  */
+import type { TenantBranding } from './tenantBranding';
 
 export interface CurrentUser {
   id: string;
@@ -15,4 +16,6 @@ export interface CurrentUser {
   tenantId: string;
   tenantName: string;
   permissions: string[];
+  isPlatformAdmin: boolean;
+  branding: TenantBranding;
 }

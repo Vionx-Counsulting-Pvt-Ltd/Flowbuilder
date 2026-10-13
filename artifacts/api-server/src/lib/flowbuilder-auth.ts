@@ -320,6 +320,7 @@ async function inviteExistingMember(input: {
   clerkUserId: string;
   email: string;
   name: string;
+  tenantId?: string;
 }): Promise<boolean> {
   const [invitedMember] = await db
     .select()
@@ -328,6 +329,7 @@ async function inviteExistingMember(input: {
       and(
         ilike(usersTable.email, input.email),
         eq(usersTable.status, "invited"),
+        input.tenantId ? eq(usersTable.tenantId, input.tenantId) : undefined,
       ),
     )
     .limit(1);
@@ -383,10 +385,15 @@ async function resolveMemberOnce(
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
     email.split("@")[0] ||
     "Workspace member";
+  const tenantFromInvitation =
+    typeof clerkUser.publicMetadata.flowbuilderTenantId === "string"
+      ? clerkUser.publicMetadata.flowbuilderTenantId
+      : undefined;
   const joinedWorkspace = await inviteExistingMember({
     clerkUserId,
     email,
     name,
+    tenantId: tenantFromInvitation,
   });
 
   if (!joinedWorkspace) {

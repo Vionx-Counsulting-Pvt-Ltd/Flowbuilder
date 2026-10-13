@@ -6,6 +6,8 @@ import {
   CreateRequestResponse,
   CreateRoleBody,
   CreateRoleResponse,
+  CreatePlatformTenantBody,
+  CreatePlatformTenantResponse,
   CreateUserBody,
   CreateUserResponse,
   CreateWorkflowBody,
@@ -19,6 +21,7 @@ import {
   GetWorkflowResponse,
   ListNotificationsResponse,
   ListPeopleResponse,
+  ListPlatformTenantsResponse,
   ListRequestsQueryParams,
   ListRequestsResponse,
   ListRolesResponse,
@@ -29,6 +32,9 @@ import {
   UpdateRoleBody,
   UpdateRoleParams,
   UpdateRoleResponse,
+  UpdatePlatformTenantBody,
+  UpdatePlatformTenantParams,
+  UpdatePlatformTenantResponse,
   UpdateUserBody,
   UpdateUserParams,
   UpdateUserResponse,
@@ -44,6 +50,7 @@ import {
   eq,
   gte,
   inArray,
+  lt,
   or,
 } from "drizzle-orm";
 import {
@@ -52,10 +59,11 @@ import {
   notificationsTable,
   requestsTable,
   rolesTable,
+  tenantsTable,
   usersTable,
   workflowsTable,
 } from "@workspace/db";
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import {
   currentMember,
   hasPermission,
@@ -81,6 +89,65 @@ type RequestRow = {
 
 const isOrgAdmin = (member: MemberContext) =>
   member.permissions.includes("admin");
+
+async function isPlatformAdmin(clerkUserId: string): Promise<boolean> {
+  const user = await clerkClient.users.getUser(clerkUserId);
+  return user.publicMetadata.flowbuilderPlatformAdmin === true;
+}
+
+async function requirePlatformAdmin(
+  member: MemberContext,
+  res: Response,
+): Promise<boolean> {
+  if (await isPlatformAdmin(member.clerkUserId)) return true;
+  res.status(403).json({ error: "Platform administrator access is required." });
+  return false;
+}
+
+function tenantBranding(tenant: {
+  logoUrl: string | null;
+  primaryColor: string | null;
+  customDomain: string | null;
+}) {
+  return {
+    logoUrl: tenant.logoUrl,
+    primaryColor: tenant.primaryColor,
+    customDomain: tenant.customDomain,
+  };
+}
+
+async function platformTenantResponse(tenant: typeof tenantsTable.$inferSelect) {
+  const [[members], [requests]] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(usersTable)
+      .where(eq(usersTable.tenantId, tenant.id)),
+    db
+      .select({ value: count() })
+      .from(requestsTable)
+      .where(eq(requestsTable.tenantId, tenant.id)),
+  ]);
+  return {
+    id: tenant.id,
+    name: tenant.name,
+    plan: tenant.plan,
+    memberLimit: tenant.memberLimit,
+    requestLimit: tenant.requestLimit,
+    memberCount: members?.value ?? 0,
+    requestCount: requests?.value ?? 0,
+    branding: tenantBranding(tenant),
+    createdAt: tenant.createdAt,
+  };
+}
+
+function validBrandingUrl(url: string | null | undefined) {
+  if (!url) return true;
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 function groupedStages(stages: WorkflowStage[]): number[] {
   return [...new Set(stages.map((stage) => stage.order))].sort(
@@ -516,6 +583,115 @@ async function addNotification(input: {
   );
 }
 
+async function createDueDateNotifications(tenantId: string): Promise<void> {
+  const now = new Date();
+  const soon = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const dueRequests = await db
+    .select()
+    .from(requestsTable)
+    .where(
+      and(
+        eq(requestsTable.tenantId, tenantId),
+        inArray(requestsTable.status, ["pending_approval", "needs_clarification"]),
+        lt(requestsTable.dueAt, soon),
+      ),
+    )
+    .orderBy(requestsTable.dueAt)
+    .limit(5000);
+  if (dueRequests.length === 0) return;
+
+  const requestIds = dueRequests.map((request) => request.id);
+  const [existingReminders, activeMembers] = await Promise.all([
+    db
+      .select({
+        userId: notificationsTable.userId,
+        requestId: notificationsTable.requestId,
+        type: notificationsTable.type,
+      })
+      .from(notificationsTable)
+      .where(
+        and(
+          eq(notificationsTable.tenantId, tenantId),
+          inArray(notificationsTable.requestId, requestIds),
+          inArray(notificationsTable.type, ["due_soon", "overdue"]),
+        ),
+      ),
+    db
+      .select({ userId: usersTable.id, roleId: usersTable.roleId, roleName: rolesTable.name })
+      .from(usersTable)
+      .innerJoin(rolesTable, eq(usersTable.roleId, rolesTable.id))
+      .where(
+        and(
+          eq(usersTable.tenantId, tenantId),
+          eq(usersTable.status, "active"),
+        ),
+      ),
+  ]);
+  const existingKeys = new Set(
+    existingReminders.map((item) => `${item.requestId}:${item.type}:${item.userId}`),
+  );
+  const roleMembers = new Map<string, string[]>();
+  for (const user of activeMembers) {
+    for (const roleKey of [user.roleId, user.roleName.toLowerCase()]) {
+      roleMembers.set(roleKey, [...(roleMembers.get(roleKey) ?? []), user.userId]);
+    }
+  }
+
+  const pending: Array<typeof notificationsTable.$inferInsert> = [];
+  for (const request of dueRequests) {
+    if (!request.dueAt) continue;
+    const reminderType = request.dueAt < now ? "overdue" : "due_soon";
+    const targets = new Set<string>();
+    if (request.assignedUserId) targets.add(request.assignedUserId);
+    if (request.assignedRoleId) {
+      for (const userId of roleMembers.get(request.assignedRoleId) ?? []) {
+        targets.add(userId);
+      }
+    }
+    for (const stage of currentStages(request)) {
+      if (stage.assigneeType === "user" && stage.assigneeId) {
+        targets.add(stage.assigneeId);
+      } else if (stage.assigneeType === "role") {
+        const roleKey = stage.assigneeId || stage.assigneeLabel.toLowerCase();
+        for (const userId of roleMembers.get(roleKey) ?? []) targets.add(userId);
+        if (stage.assigneeId) {
+          for (const userId of roleMembers.get(stage.assigneeLabel.toLowerCase()) ?? []) {
+            targets.add(userId);
+          }
+        }
+      }
+    }
+    for (const userId of targets) {
+      const key = `${request.id}:${reminderType}:${userId}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+      pending.push({
+        tenantId,
+        userId,
+        requestId: request.id,
+        title: reminderType === "overdue" ? "Approval task is overdue" : "Approval task due soon",
+        message: request.requestCode,
+        type: reminderType,
+      });
+    }
+  }
+  if (pending.length) {
+    await db.insert(notificationsTable).values(pending).onConflictDoNothing();
+  }
+}
+
+const dueNotificationTimer = setInterval(() => {
+  void (async () => {
+    try {
+      const tenants = await db.select({ id: tenantsTable.id }).from(tenantsTable);
+      for (const tenant of tenants) await createDueDateNotifications(tenant.id);
+    } catch (error) {
+      console.error("FlowBuilder due-date notification sweep failed", error);
+    }
+  })();
+}, 15 * 60 * 1000);
+dueNotificationTimer.unref();
+
 async function workflowResponse(
   workflow: typeof workflowsTable.$inferSelect,
 ) {
@@ -633,6 +809,15 @@ async function notifyCurrentStages(
 
 router.get("/me", async (_req, res): Promise<void> => {
   const member = currentMember(res);
+  const [tenant] = await db
+    .select({
+      logoUrl: tenantsTable.logoUrl,
+      primaryColor: tenantsTable.primaryColor,
+      customDomain: tenantsTable.customDomain,
+    })
+    .from(tenantsTable)
+    .where(eq(tenantsTable.id, member.tenantId))
+    .limit(1);
   res.json(
     GetCurrentUserResponse.parse({
       id: member.id,
@@ -643,12 +828,15 @@ router.get("/me", async (_req, res): Promise<void> => {
       tenantId: member.tenantId,
       tenantName: member.tenantName,
       permissions: member.permissions,
+      isPlatformAdmin: await isPlatformAdmin(member.clerkUserId),
+      branding: tenantBranding(tenant ?? { logoUrl: null, primaryColor: null, customDomain: null }),
     }),
   );
 });
 
 router.get("/dashboard", async (_req, res): Promise<void> => {
   const member = currentMember(res);
+  await createDueDateNotifications(member.tenantId);
   const rows = (await getRequestRows(member.tenantId)).filter((row) =>
     canSeeRequest(row, member),
   );
@@ -937,6 +1125,19 @@ router.post("/requests", async (req, res): Promise<void> => {
     .limit(1);
   if (!workflow) {
     res.status(404).json({ error: "Active workflow not found." });
+    return;
+  }
+  const [tenant] = await db
+    .select({ requestLimit: tenantsTable.requestLimit })
+    .from(tenantsTable)
+    .where(eq(tenantsTable.id, member.tenantId))
+    .limit(1);
+  const [requestCount] = await db
+    .select({ value: count() })
+    .from(requestsTable)
+    .where(eq(requestsTable.tenantId, member.tenantId));
+  if (tenant && (requestCount?.value ?? 0) >= tenant.requestLimit) {
+    res.status(403).json({ error: "This workspace has reached its request limit." });
     return;
   }
   const submissionData: Record<string, unknown> = { ...parsed.data.formData };
@@ -1408,6 +1609,19 @@ router.post("/users", async (req, res): Promise<void> => {
     res.status(403).json({ error: "Only workspace admins can add members." });
     return;
   }
+  const [tenant] = await db
+    .select({ memberLimit: tenantsTable.memberLimit })
+    .from(tenantsTable)
+    .where(eq(tenantsTable.id, member.tenantId))
+    .limit(1);
+  const [memberCount] = await db
+    .select({ value: count() })
+    .from(usersTable)
+    .where(eq(usersTable.tenantId, member.tenantId));
+  if (tenant && (memberCount?.value ?? 0) >= tenant.memberLimit) {
+    res.status(403).json({ error: "This workspace has reached its member limit." });
+    return;
+  }
   const parsed = CreateUserBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -1721,6 +1935,7 @@ router.patch("/roles/:roleId", async (req, res): Promise<void> => {
 
 router.get("/notifications", async (_req, res): Promise<void> => {
   const member = currentMember(res);
+  await createDueDateNotifications(member.tenantId);
   const rows = await db
     .select()
     .from(notificationsTable)
@@ -1867,6 +2082,180 @@ router.get("/reports/overview", async (_req, res): Promise<void> => {
       workload,
     }),
   );
+});
+
+router.get("/platform/tenants", async (_req, res): Promise<void> => {
+  const member = currentMember(res);
+  if (!(await requirePlatformAdmin(member, res))) return;
+  const tenants = await db
+    .select()
+    .from(tenantsTable)
+    .orderBy(desc(tenantsTable.createdAt))
+    .limit(2000);
+  res.json(
+    ListPlatformTenantsResponse.parse(
+      await Promise.all(tenants.map(platformTenantResponse)),
+    ),
+  );
+});
+
+router.post("/platform/tenants", async (req, res): Promise<void> => {
+  const member = currentMember(res);
+  if (!(await requirePlatformAdmin(member, res))) return;
+  const parsed = CreatePlatformTenantBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const email = parsed.data.adminEmail.trim().toLowerCase();
+  const branding = parsed.data.branding;
+  if (
+    !validBrandingUrl(branding?.logoUrl) ||
+    (branding?.primaryColor && !/^#[0-9a-fA-F]{6}$/.test(branding.primaryColor)) ||
+    (branding?.customDomain && !/^(?=.{1,253}$)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/.test(branding.customDomain))
+  ) {
+    res.status(400).json({ error: "Check the logo URL, brand color, and custom domain." });
+    return;
+  }
+
+  const tenantId = crypto.randomUUID();
+  let invitationId: string;
+  try {
+    const invitation = await clerkClient.invitations.createInvitation({
+      emailAddress: email,
+      notify: true,
+      publicMetadata: { flowbuilderTenantId: tenantId },
+      redirectUrl: "/sign-up",
+    });
+    invitationId = invitation.id;
+  } catch (error) {
+    req.log.warn({ error, email }, "Unable to invite the first tenant admin");
+    res.status(409).json({
+      error: "The admin invitation could not be sent. Check that this email is available in Clerk.",
+    });
+    return;
+  }
+
+  const defaultRoles = [
+    { name: "Company Admin", description: "Manage workspace users, workflows, requests, and reports.", permissions: ["view", "create", "approve", "admin", "report"] },
+    { name: "Workflow Owner", description: "Build workflows and action assigned requests.", permissions: ["view", "create", "approve", "report"] },
+    { name: "Approver", description: "Review and action requests assigned to you.", permissions: ["view", "approve"] },
+    { name: "Requester", description: "Raise requests and track their status.", permissions: ["view", "create"] },
+  ] as const;
+  const roleIds = new Map(defaultRoles.map((role) => [role.name, crypto.randomUUID()]));
+  const adminId = crypto.randomUUID();
+  try {
+    const [tenant] = await db.transaction(async (tx) => {
+      const [createdTenant] = await tx
+        .insert(tenantsTable)
+        .values({
+          id: tenantId,
+          name: parsed.data.name.trim(),
+          plan: parsed.data.plan,
+          memberLimit: parsed.data.memberLimit,
+          requestLimit: parsed.data.requestLimit,
+          logoUrl: branding?.logoUrl ?? null,
+          primaryColor: branding?.primaryColor ?? null,
+          customDomain: branding?.customDomain?.toLowerCase() ?? null,
+        })
+        .returning();
+      await tx.insert(rolesTable).values(
+        defaultRoles.map((role) => ({
+          id: roleIds.get(role.name)!,
+          tenantId,
+          name: role.name,
+          description: role.description,
+          permissions: [...role.permissions],
+          isDefault: true,
+        })),
+      );
+      await tx.insert(usersTable).values({
+        id: adminId,
+        tenantId,
+        email,
+        name: parsed.data.adminName.trim(),
+        roleId: roleIds.get("Company Admin")!,
+        status: "invited",
+        clerkInvitationId: invitationId,
+      });
+      await tx.insert(auditEventsTable).values({
+        tenantId,
+        entityType: "workspace",
+        entityId: tenantId,
+        action: "Tenant provisioned",
+      });
+      return [createdTenant];
+    });
+    res.status(201).json(
+      CreatePlatformTenantResponse.parse(await platformTenantResponse(tenant)),
+    );
+  } catch (error) {
+    try {
+      await clerkClient.invitations.revokeInvitation(invitationId);
+    } catch (revokeError) {
+      req.log.warn({ revokeError, invitationId }, "Unable to revoke an uncommitted tenant invite");
+    }
+    req.log.error({ error, tenantId }, "Unable to provision tenant");
+    res.status(500).json({ error: "The tenant could not be provisioned." });
+  }
+});
+
+router.patch("/platform/tenants/:tenantId", async (req, res): Promise<void> => {
+  const member = currentMember(res);
+  if (!(await requirePlatformAdmin(member, res))) return;
+  const params = UpdatePlatformTenantParams.safeParse(req.params);
+  const parsed = UpdatePlatformTenantBody.safeParse(req.body);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  if (
+    (parsed.data.branding && !validBrandingUrl(parsed.data.branding.logoUrl)) ||
+    (parsed.data.branding?.primaryColor && !/^#[0-9a-fA-F]{6}$/.test(parsed.data.branding.primaryColor)) ||
+    (parsed.data.branding?.customDomain && !/^(?=.{1,253}$)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/.test(parsed.data.branding.customDomain))
+  ) {
+    res.status(400).json({ error: "Check the logo URL, brand color, and custom domain." });
+    return;
+  }
+  const [existing] = await db
+    .select()
+    .from(tenantsTable)
+    .where(eq(tenantsTable.id, params.data.tenantId))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Tenant not found." });
+    return;
+  }
+  const branding = parsed.data.branding;
+  const [updated] = await db
+    .update(tenantsTable)
+    .set({
+      ...(parsed.data.name === undefined ? {} : { name: parsed.data.name.trim() }),
+      ...(parsed.data.plan === undefined ? {} : { plan: parsed.data.plan }),
+      ...(parsed.data.memberLimit === undefined ? {} : { memberLimit: parsed.data.memberLimit }),
+      ...(parsed.data.requestLimit === undefined ? {} : { requestLimit: parsed.data.requestLimit }),
+      ...(branding === undefined
+        ? {}
+        : {
+            logoUrl: branding.logoUrl,
+            primaryColor: branding.primaryColor,
+            customDomain: branding.customDomain?.toLowerCase() ?? null,
+          }),
+    })
+    .where(eq(tenantsTable.id, existing.id))
+    .returning();
+  await recordAudit({
+    tenantId: existing.id,
+    actorUserId: member.id,
+    entityType: "tenant",
+    entityId: existing.id,
+    action: "Tenant plan or branding updated",
+  });
+  res.json(UpdatePlatformTenantResponse.parse(await platformTenantResponse(updated)));
 });
 
 export default router;

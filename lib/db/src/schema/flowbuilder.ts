@@ -8,6 +8,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export type WorkflowField = {
   id: string;
@@ -67,6 +68,12 @@ export type WorkflowStage = {
 export const tenantsTable = pgTable("flow_tenants", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  plan: text("plan").notNull().default("starter"),
+  memberLimit: integer("member_limit").notNull().default(20),
+  requestLimit: integer("request_limit").notNull().default(10000),
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color"),
+  customDomain: text("custom_domain"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -233,4 +240,8 @@ export const notificationsTable = pgTable("flow_notifications", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("flow_notifications_due_reminder_unique_idx")
+    .on(table.userId, table.requestId, table.type)
+    .where(sql`${table.type} IN ('due_soon', 'overdue')`),
+]);
