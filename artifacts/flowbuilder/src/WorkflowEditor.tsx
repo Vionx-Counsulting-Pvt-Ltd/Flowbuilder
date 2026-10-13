@@ -318,7 +318,7 @@ export default function WorkflowEditor() {
           <div className="fb-canvas-top"><div><span className="section-label">REQUEST FORM</span><h2>Canvas <span>{definition.fields.length} {definition.fields.length === 1 ? 'field' : 'fields'}</span></h2></div><button type="button" className="fb-canvas-add" onClick={() => addField('text')} data-testid="button-canvas-add-field"><Plus size={15} /> Add field</button></div>
           <section className="fb-canvas" aria-label="Form canvas" data-testid="form-canvas">
             <div className="fb-form-sheet">
-              <div className="fb-sheet-heading"><span className="fb-sheet-mark">F</span><div><b>{definition.name || 'Untitled workflow'}</b><small>{definition.description || 'Add a brief description to guide the requester.'}</small></div><span className="fb-sheet-chip">{definition.category || 'Category'}</span></div>
+              <div className="fb-sheet-heading"><span className="fb-sheet-mark">F</span><div><b>{definition.name || 'Untitled workflow'}</b><textarea className="fb-sheet-description" rows={1} aria-label="Workflow description" value={definition.description} placeholder="Add a brief description to guide the requester." onChange={e => setDefinition(value => ({ ...value, description: e.target.value }))} data-testid="input-workflow-description" /></div><span className="fb-sheet-chip">{definition.category || 'Category'}</span></div>
               <div className="fb-canvas-fields">
                 {resolvedFields.map((field, index) => <button key={field.id} type="button" className={`fb-field-block ${selectedId === field.id ? 'is-selected' : ''} ${field.hidden ? 'is-hidden' : ''}`} style={{ gridColumn: `span ${Math.min(6, Math.max(1, field.width || 6))}` }} onClick={() => setSelectedId(field.id)} data-testid={`canvas-field-${field.id}`} aria-pressed={selectedId === field.id}>
                   <div className="fb-field-block-top"><span className="fb-type-badge">{fieldTypes.find(item => item.type === field.type)?.label || field.type}</span><span className="fb-field-index">FIELD {String(index + 1).padStart(2, '0')}</span>{field.required && <span className="fb-required-mark">Required</span>}</div>
@@ -332,12 +332,8 @@ export default function WorkflowEditor() {
             </div>
             <div className="fb-canvas-footnote"><span><Settings2 size={13} /> Form settings</span><span>Responsive layout · 6-column grid</span></div>
           </section>
-          <section className="fb-details-card">
-            <div className="fb-section-title"><div><span className="fb-section-number">01</span><div><h2>Form introduction</h2><p>Give requesters the context they need before they begin.</p></div></div></div>
-            <Label title="Description"><textarea className={`${inputClass} fb-description`} value={definition.description} placeholder="What is this workflow for? Include any guidance that will help someone submit a complete request." onChange={e => setDefinition(value => ({ ...value, description: e.target.value }))} data-testid="input-workflow-description" /></Label>
-          </section>
           <section className="fb-details-card fb-approval-card">
-            <div className="fb-section-title"><div><span className="fb-section-number">02</span><div><h2>Approval route</h2><p>Each stage has a clear owner and response window.</p></div></div><Button className="button-outline" type="button" onClick={() => setDefinition(value => ({ ...value, stages: [...value.stages, blankStage(value.stages.length + 1)] }))} data-testid="button-add-stage"><Plus size={14} /> Add stage</Button></div>
+            <div className="fb-section-title"><div><span className="fb-section-number">01</span><div><h2>Approval route</h2><p>Each stage has a clear owner and response window.</p></div></div><Button className="button-outline" type="button" onClick={() => setDefinition(value => ({ ...value, stages: [...value.stages, blankStage(value.stages.length + 1)] }))} data-testid="button-add-stage"><Plus size={14} /> Add stage</Button></div>
             <div className="fb-stage-list">{definition.stages.map((stage, index) => <article key={stage.id} className="fb-stage-row">
               <div className="fb-stage-number">{String(index + 1).padStart(2, '0')}</div><div className="fb-stage-fields">
                 <Label title="Stage name"><input className={inputClass} value={stage.name} onChange={e => patchStage(stage.id, { name: e.target.value })} placeholder="e.g. Finance review" data-testid={`input-stage-name-${stage.id}`} /></Label>

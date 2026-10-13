@@ -185,7 +185,8 @@ function AppFrame() {
     if (item.href === '/platform') return current.data?.isPlatformAdmin ?? false;
     return true;
   });
-  const activeNav = visibleNav.find(item => location.startsWith(item.href))?.href || '/dashboard';
+  const activeNav = location.startsWith('/notifications') ? '/notifications' : visibleNav.find(item => location.startsWith(item.href))?.href || '/dashboard';
+  const activePageLabel = activeNav === '/notifications' ? 'Notifications' : visibleNav.find(item => item.href === activeNav)?.label || 'Overview';
   const tenantColor = current.data?.branding.primaryColor;
   const themeStyle = tenantColor ? ({
     '--primary': hexToHsl(tenantColor),
@@ -196,14 +197,15 @@ function AppFrame() {
   return <div className="app-shell flex" style={themeStyle}>
     <aside className={cx('sidebar fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col transition-transform md:translate-x-0', mobileNav ? 'translate-x-0' : '-translate-x-full')}>
       <Link href="/dashboard" className="sidebar-brand"><img src={current.data?.branding.logoUrl || `${basePath}/logo.svg`} alt={current.data?.tenantName ? `${current.data.tenantName} logo` : ''} /><span>flowbuilder</span><span className="workspace-label">WORKSPACE</span></Link>
+      {mobileNav && <IconButton label="Close navigation" className="sidebar-close" data-testid="button-close-mobile-navigation" onClick={() => setMobileNav(false)}><X size={18} /></IconButton>}
       <div className="sidebar-workspace"><span className="workspace-monogram">{initials(current.data?.tenantName).slice(0, 1)}</span><div><b>{current.data?.tenantName || 'Your workspace'}</b><small>Operations team</small></div><ChevronDown size={15} /></div>
        <span className="sidebar-caption">WORKSPACE</span><nav className="sidebar-nav">{visibleNav.map(item => <Link key={item.href} href={item.href} onClick={() => setMobileNav(false)} className={cx('nav-link', activeNav === item.href && 'active')}><item.icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.href === '/requests' && <span className="nav-count">{notificationCount ? Math.min(notificationCount, 9) : ''}</span>}</Link>)}</nav>
       <div className="sidebar-bottom"><div className="sidebar-tip"><Sparkles size={16} /><span>Small steps, clear owners.<br />That’s how good work gets done.</span></div><div className="user-menu"><div className="avatar">{initials(current.data?.name)}</div><div className="user-copy"><b>{current.data?.name || 'Loading profile'}</b><small>{current.data?.roleName || 'Workspace member'}</small></div><button className="user-signout" onClick={() => window.dispatchEvent(new Event('flowbuilder:signout'))} aria-label="Account options"><MoreHorizontal size={17} /></button></div></div>
     </aside>
-    {mobileNav && <button className="mobile-scrim md:hidden" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
+    {mobileNav && <button type="button" className="mobile-scrim md:hidden" onClick={() => setMobileNav(false)} aria-label="Dismiss navigation overlay" />}
     <main className="main-column min-w-0 flex-1 md:ml-[248px]">
-       <header className="topbar"><div className="flex items-center gap-3"><IconButton label="Open menu" className="md:hidden" onClick={() => setMobileNav(true)}><Menu size={20} /></IconButton><span className="crumb">Workspace <ChevronRight size={13} /> <b>{visibleNav.find(item => item.href === activeNav)?.label || 'Overview'}</b></span></div><div className="topbar-actions"><Link href="/notifications" className="top-icon" aria-label="Notifications"><Bell size={18} />{notificationCount > 0 && <i />}</Link><button className="help-link"><CircleHelp size={17} /><span>Help</span></button><span className="top-avatar">{initials(current.data?.name)}</span></div></header>
-      <div className="page-content"><Switch>
+       <header className="topbar"><div className="flex items-center gap-3"><IconButton label="Open menu" className="mobile-menu-toggle" onClick={() => setMobileNav(true)}><Menu size={20} /></IconButton><span className="crumb">Workspace <ChevronRight size={13} /> <b>{activePageLabel}</b></span></div><div className="topbar-actions"><Link href="/notifications" className="top-icon" aria-label="Notifications"><Bell size={18} />{notificationCount > 0 && <i />}</Link><button className="help-link"><CircleHelp size={17} /><span>Help</span></button><span className="top-avatar">{initials(current.data?.name)}</span></div></header>
+      <div className={cx('page-content', /^\/workflows\/(new|[^/]+\/edit)\/?$/.test(location) && 'page-content-editor')}><Switch>
         <Route path="/dashboard" component={DashboardPage} />
         <Route path="/workflows/new" component={WorkflowEditor} />
         <Route path="/tables" component={TablesPage} />

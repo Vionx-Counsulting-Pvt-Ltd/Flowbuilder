@@ -331,7 +331,7 @@ export default function RequestFormModal({ workflows, onClose }: { workflows: Wo
         {uploadError && <p className="form-error" data-testid="status-upload-error">{uploadError}</p>}
         {detail.isError && <p className="form-error" role="alert">The latest form choices could not be loaded. <button type="button" onClick={() => void detail.refetch()}>Retry</button></p>}
         {create.isError && <p className="form-error" role="alert" data-testid="status-request-error">{failureMessage}</p>}
-        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-quiet" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary" data-testid="button-submit-request" disabled={!selected || detail.isLoading || detail.isError || create.isPending || Boolean(uploadingField)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
+        <div className="modal-actions border-t border-border pt-4"><button type="button" className="button button-quiet" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary inline-flex items-center justify-center gap-2 whitespace-nowrap" data-testid="button-submit-request" disabled={!selected || detail.isLoading || detail.isError || create.isPending || Boolean(uploadingField)}>{create.isPending ? "Submitting…" : "Submit request"} <ArrowRight size={15} /></button></div>
       </form>
     </section>
   </div>;

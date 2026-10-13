@@ -3,3 +3,4 @@
 - [Draft validation policy](draft-validation-policy.md) — allow unfinished drafts, but never relax publication checks when editing live forms.
 - [Reference data requirements](reference-data-requirements.md) — maintained tables must supply form choices, including onboarding branches.
 - [Spreadsheet imports](spreadsheet-import-compatibility.md) — distinguish workbook results from worksheet grids; verify the installed reader API.
+- [Workspace layout policy](editor-layout-policy.md) — compact, full-width pages; editor-only pane scrolling and unchanged application behavior.
