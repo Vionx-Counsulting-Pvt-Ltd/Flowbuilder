@@ -19,7 +19,7 @@ import {
   useListWorkflows, useMarkNotificationRead, useUpdateRole, useUpdateUser, useUpdateWorkflow,
 } from '@workspace/api-client-react';
 import type {
-  Notification, RequestStatus, RequestSummary, Workflow, WorkflowField, WorkflowInput, WorkflowStage,
+  CurrentUser, DashboardSummary, Notification, RequestStatus, RequestSummary, Workflow, WorkflowField, WorkflowInput, WorkflowStage,
   WorkspaceRole, WorkspaceUser,
 } from '@workspace/api-client-react';
 import WorkflowEditor from './WorkflowEditor';
@@ -263,10 +263,36 @@ function App() {
 }
 
 const filters = ['All', 'Overdue', 'Due today', 'Due in 3 days', 'This week', 'Pending clarification'] as const;
+type DashboardData = DashboardSummary;
+type OverviewRole = 'admin' | 'builder' | 'approver' | 'requester';
+const overviewRoleLabels: Record<OverviewRole, string> = { admin: 'Admin view', builder: 'Workflow owner view', approver: 'Approver view', requester: 'Requester view' };
+function overviewRole(user?: CurrentUser): OverviewRole {
+  if (!user) return 'approver';
+  if (user.permissions.includes('admin')) return 'admin';
+  if (user.permissions.includes('build') || user.roleName === 'Workflow Owner') return 'builder';
+  if (user.permissions.includes('approve')) return 'approver';
+  return 'requester';
+}
+function greeting(name?: string) {
+  const hour = new Date().getHours(); const first = name?.split(' ')[0];
+  return <>{hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'}{first ? `, ${first}` : ''}<span className="title-period">.</span></>;
+}
+function todayEyebrow(role: OverviewRole) { return `${new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date()).toUpperCase()} · ${overviewRoleLabels[role].toUpperCase()}`; }
+function completionRate(summary?: DashboardData) { return summary?.allocatedToday ? Math.min(100, Math.round((summary.completedToday / summary.allocatedToday) * 100)) : 0; }
+
 function DashboardPage() {
-  const query = useGetDashboard(); const current = useGetCurrentUser();
+  const current = useGetCurrentUser();
+  if (current.isLoading) return <Skeleton />;
+  const role = overviewRole(current.data);
+  if (role === 'admin') return <AdminOverview user={current.data} />;
+  if (role === 'builder') return <BuilderOverview user={current.data} />;
+  if (role === 'requester') return <RequesterOverview user={current.data} />;
+  return <ApproverOverview user={current.data} />;
+}
+
+function TaskPanel({ summary, title = 'On your plate', description = 'Good work starts with the next right thing.' }: { summary?: DashboardData; title?: string; description?: string }) {
   const [filter, setFilter] = useState<string>('All');
-  const tasks = query.data?.tasks || [];
+  const tasks = summary?.tasks || [];
   const visible = tasks.filter(task => {
     if (filter === 'Pending clarification') return task.status === 'needs_clarification';
     if (!task.dueAt) return filter === 'All';
@@ -278,24 +304,112 @@ function DashboardPage() {
     if (filter === 'This week') return dayDiff >= 0 && dayDiff <= 7;
     return true;
   });
-  const summary = query.data;
+  return <section className="surface task-panel"><div className="panel-heading"><div><h2>{title}</h2><p>{description}</p></div><Link href="/requests" className="text-link">All requests <ArrowRight size={14} /></Link></div>
+    <div className="filter-strip" role="tablist" aria-label="Filter tasks">{filters.map(item => <button key={item} role="tab" aria-selected={filter === item} className={cx(filter === item && 'selected')} onClick={() => setFilter(item)} data-testid={`filter-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}{item === 'Overdue' && !!summary?.overdueCount && <i className="filter-badge">{summary.overdueCount}</i>}</button>)}</div>
+    {visible.length ? <div className="task-list">{visible.map(task => <Link href={`/requests/${task.id}`} key={task.id} className="task-row" data-testid={`task-row-${task.id}`}><div className={cx('task-symbol', task.status === 'needs_clarification' && 'symbol-clarify')}>{task.status === 'needs_clarification' ? <CircleHelp size={17} /> : <FileCheck2 size={17} />}</div><div className="task-main"><div><b>{task.workflowName}</b><span className="task-code mono">{task.requestCode}</span></div><small>{task.requesterName} <i /> {task.currentStageName}</small></div><div className={cx('task-due', task.dueAt && new Date(task.dueAt) < new Date() && 'overdue')}><Clock3 size={13} />{formatDate(task.dueAt)}</div><ChevronRight className="row-arrow" size={16} /></Link>)}</div> : <EmptyState title={filter === 'All' ? 'A clear plate. Nice.' : 'Nothing in this view'} body={filter === 'All' ? 'You’re all caught up. When a request needs you, it’ll show up here.' : `There are no tasks matching “${filter}” right now.`} />}</section>;
+}
+function WorkflowShortcuts({ summary, canCreate }: { summary?: DashboardData; canCreate: boolean }) {
+  return <section className="surface side-widget"><div className="widget-head"><div><span className="section-label">YOUR WORKFLOWS</span><h2>Shortcuts</h2></div><Link href="/workflows" className="tiny-action" aria-label="All workflows"><ArrowRight size={15} /></Link></div>{summary?.myWorkflows?.length ? <div className="shortcut-list">{summary.myWorkflows.slice(0, 5).map(wf => <Link href={`/workflows/${encodeURIComponent(wf.id)}/requests`} key={wf.id} className="shortcut" data-testid={`workflow-shortcut-${wf.id}`}><span className="shortcut-icon"><GitBranch size={16} /></span><span><b>{wf.name}</b><small>{wf.requestCount} requests · {wf.category}</small></span><ArrowRight size={14} /></Link>)}</div> : <div className="widget-empty">Your team’s workflows will appear here.</div>}{canCreate && <Link className="widget-cta" href="/workflows"><Plus size={15} /> Create a workflow</Link>}</section>;
+}
+function ProgressNote({ summary }: { summary?: DashboardData }) {
+  return <section className="progress-note"><div className="progress-orbit"><span>{completionRate(summary)}<small>%</small></span></div><div><b>Steady progress</b><p>{summary?.completedToday ?? 0} of {summary?.allocatedToday ?? 0} tasks wrapped today. Keep the rhythm going.</p></div></section>;
+}
+function RecentPanel({ summary }: { summary?: DashboardData }) {
+  return <section className="surface recent-panel enter enter-delay-3"><div className="panel-heading"><div><h2>Recently submitted</h2><p>Requests entering the system across your team.</p></div><Link href="/requests" className="text-link">View all <ArrowRight size={14} /></Link></div><RequestTable requests={summary?.recentRequests?.slice(0, 5) || []} /></section>;
+}
+
+function ApproverOverview({ user }: { user?: CurrentUser }) {
+  const query = useGetDashboard(); const summary = query.data;
   return <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}><>
-    <PageHeading eyebrow="MONDAY, YOUR WAY" title={<>Good morning<span className="title-period">.</span></>} description="Here’s what needs your attention, and what your team has been moving forward." action={<Link href="/workflows" className="button button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><WorkflowIcon size={16} /> Browse workflows</Link>} />
+    <PageHeading eyebrow={todayEyebrow('approver')} title={greeting(user?.name)} description="Here’s what needs your decision, and what your team has been moving forward." action={<Link href="/requests" className="button button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><ListChecks size={16} /> Review queue</Link>} />
     <section className="summary-grid enter enter-delay-1">
       <div className="summary-card focus-card"><div className="summary-label">MY OPEN TASKS <ArrowUpRight size={14} /></div><b>{summary?.pendingCount ?? 0}</b><span><i className="mini-dot orange" /> {summary?.overdueCount ?? 0} overdue and need a look</span><div className="mini-bars">{[38, 63, 49, 76, 54, 86, 68].map((h, i) => <i key={i} style={{ height: `${h}%` }} />)}</div></div>
-      <div className="summary-card"><div className="summary-label">COMPLETED TODAY <CheckCircle2 size={14} /></div><b>{summary?.completedToday ?? 0}<small> / {summary?.allocatedToday ?? 0}</small></b><span>Requests moved to the next step</span><div className="summary-progress"><i style={{ width: `${summary?.allocatedToday ? Math.min(100, Math.round((summary.completedToday / summary.allocatedToday) * 100)) : 0}%` }} /></div></div>
-      <div className="summary-card"><div className="summary-label">REQUESTS IN MOTION <Activity size={14} /></div><b>{summary?.totalRequests ?? 0}</b><span>Across your workspace</span><span className="summary-trend"><ArrowUpRight size={14} /> Your team’s queue</span></div>
+      <div className="summary-card"><div className="summary-label">COMPLETED TODAY <CheckCircle2 size={14} /></div><b>{summary?.completedToday ?? 0}<small> / {summary?.allocatedToday ?? 0}</small></b><span>Requests moved to the next step</span><div className="summary-progress"><i style={{ width: `${completionRate(summary)}%` }} /></div></div>
+      <div className="summary-card"><div className="summary-label">NEEDS CLARIFICATION <CircleHelp size={14} /></div><b>{summary?.tasks.filter(task => task.status === 'needs_clarification').length ?? 0}</b><span>Waiting on more detail from requesters</span></div>
     </section>
     <div className="dashboard-columns enter enter-delay-2">
-      <section className="surface task-panel"><div className="panel-heading"><div><h2>On your plate</h2><p>Good work starts with the next right thing.</p></div><Link href="/requests" className="text-link">All requests <ArrowRight size={14} /></Link></div>
-        <div className="filter-strip" role="tablist" aria-label="Filter tasks">{filters.map(item => <button key={item} role="tab" aria-selected={filter === item} className={cx(filter === item && 'selected')} onClick={() => setFilter(item)} data-testid={`filter-${item.toLowerCase().replaceAll(' ', '-')}`}>{item}{item === 'Overdue' && !!summary?.overdueCount && <i className="filter-badge">{summary.overdueCount}</i>}</button>)}</div>
-        {visible.length ? <div className="task-list">{visible.map((task, index) => <Link href={`/requests/${task.id}`} key={task.id} className="task-row" data-testid={`task-row-${task.id}`}><div className={cx('task-symbol', task.status === 'needs_clarification' && 'symbol-clarify')}>{task.status === 'needs_clarification' ? <CircleHelp size={17} /> : <FileCheck2 size={17} />}</div><div className="task-main"><div><b>{task.workflowName}</b><span className="task-code mono">{task.requestCode}</span></div><small>{task.requesterName} <i /> {task.currentStageName}</small></div><div className={cx('task-due', task.dueAt && new Date(task.dueAt) < new Date() && 'overdue')}><Clock3 size={13} />{formatDate(task.dueAt)}</div><ChevronRight className="row-arrow" size={16} /></Link>)}</div> : <EmptyState title={filter === 'All' ? 'A clear plate. Nice.' : 'Nothing in this view'} body={filter === 'All' ? 'You’re all caught up. When a request needs you, it’ll show up here.' : `There are no tasks matching “${filter}” right now.`} />}</section>
+      <TaskPanel summary={summary} />
+      <aside className="dashboard-side"><ProgressNote summary={summary} /><WorkflowShortcuts summary={summary} canCreate={false} /></aside>
+    </div>
+    <RecentPanel summary={summary} />
+  </></LoadState>;
+}
+
+function AdminOverview({ user }: { user?: CurrentUser }) {
+  const query = useGetDashboard(); const report = useGetReportOverview(); const users = useListUsers(); const summary = query.data;
+  const maxVolume = Math.max(1, ...(report.data?.weeklyVolume.map(item => item.count) || [1]));
+  const bottlenecks = [...(report.data?.workload || [])].sort((a, b) => b.pending - a.pending).slice(0, 5);
+  const maxPending = Math.max(1, ...bottlenecks.map(person => person.pending));
+  const overdue = (summary?.tasks || []).filter(task => task.dueAt && new Date(task.dueAt) < new Date()).slice(0, 5);
+  const active = users.data?.filter(member => member.status === 'active').length ?? 0;
+  const invited = users.data?.filter(member => member.status === 'invited').length ?? 0;
+  return <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}><>
+    <PageHeading eyebrow={todayEyebrow('admin')} title={greeting(user?.name)} description="The pulse of your workspace: where work is flowing, and where it’s getting stuck." action={<><Link href="/team" className="button button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><Users size={16} /> Team</Link><Link href="/reports" className="button button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><Activity size={16} /> Reports</Link></>} />
+    <div className="report-kpis enter enter-delay-1">
+      <div className="surface report-kpi"><span>REQUESTS IN MOTION</span><b>{summary?.totalRequests ?? 0}</b><small>Across the whole workspace</small></div>
+      <div className="surface report-kpi"><span>OVERDUE DECISIONS</span><b className={cx(!!summary?.overdueCount && 'kpi-alert')}>{summary?.overdueCount ?? 0}</b><small>Past their stage SLA</small></div>
+      <div className="surface report-kpi"><span>AVG. TURNAROUND</span><b>{report.data?.averageTurnaroundHours ?? 0}<small> hrs</small></b><small>Submission to final decision</small></div>
+      <div className="surface report-kpi"><span>APPROVAL RATE</span><b>{report.data?.approvalRate ?? 0}<small>%</small></b><small>Requests approved this period</small></div>
+    </div>
+    <div className="dashboard-columns enter enter-delay-2">
+      <section className="surface chart-panel"><div className="panel-heading"><div><h2>Request volume</h2><p>Requests submitted over the last 7 days.</p></div><Link href="/reports" className="text-link">Full report <ArrowRight size={14} /></Link></div>{report.data?.weeklyVolume.length ? <div className="volume-chart overview-volume"><div className="chart-bars">{report.data.weeklyVolume.map((item, i) => <div className="chart-column" key={`${item.label}-${i}`}><span className="bar-value">{item.count}</span><div className="bar-track"><i style={{ height: `${Math.max(4, item.count / maxVolume * 100)}%` }} /></div><small>{item.label}</small></div>)}</div></div> : <EmptyState title="No volume yet" body="Submitted requests will chart here." />}</section>
       <aside className="dashboard-side">
-         <section className="surface side-widget"><div className="widget-head"><div><span className="section-label">YOUR WORKFLOWS</span><h2>Shortcuts</h2></div><Link href="/workflows" className="tiny-action" aria-label="All workflows"><ArrowRight size={15} /></Link></div>{summary?.myWorkflows?.length ? <div className="shortcut-list">{summary.myWorkflows.slice(0, 5).map(wf => <Link href={`/workflows/${encodeURIComponent(wf.id)}/requests`} key={wf.id} className="shortcut" data-testid={`workflow-shortcut-${wf.id}`}><span className="shortcut-icon"><GitBranch size={16} /></span><span><b>{wf.name}</b><small>{wf.requestCount} requests · {wf.category}</small></span><ArrowRight size={14} /></Link>)}</div> : <div className="widget-empty">Your team’s workflows will appear here.</div>}{(current.data?.permissions.includes('admin') || current.data?.roleName === 'Workflow Owner') && <Link className="widget-cta" href="/workflows"><Plus size={15} /> Create a workflow</Link>}</section>
-        <section className="progress-note"><div className="progress-orbit"><span>{summary?.allocatedToday ? Math.round((summary.completedToday / summary.allocatedToday) * 100) : 0}<small>%</small></span></div><div><b>Steady progress</b><p>{summary?.completedToday ?? 0} of {summary?.allocatedToday ?? 0} tasks wrapped today. Keep the rhythm going.</p></div></section>
+        <section className="surface side-widget"><div className="widget-head"><div><span className="section-label">PEOPLE</span><h2>Your team</h2></div><Link href="/team" className="tiny-action" aria-label="Manage team"><ArrowRight size={15} /></Link></div><div className="overview-team"><div><b>{users.data?.length ?? 0}</b><small>members</small></div><div><b>{active}</b><small>active</small></div><div><b>{invited}</b><small>invited</small></div></div><Link className="widget-cta" href="/team"><Plus size={15} /> Invite a teammate</Link></section>
+        <section className="surface side-widget"><div className="widget-head"><div><span className="section-label">BOTTLENECKS</span><h2>Who’s holding the queue</h2></div></div>{bottlenecks.some(person => person.pending) ? <div className="overview-bottlenecks">{bottlenecks.filter(person => person.pending).map(person => <div key={person.name}><span className="avatar">{initials(person.name)}</span><div><b>{person.name}</b><div className="overview-meter"><i style={{ width: `${person.pending / maxPending * 100}%` }} /></div></div><span className="mono">{person.pending}</span></div>)}</div> : <div className="widget-empty">No one has a backlog right now.</div>}</section>
       </aside>
     </div>
-    <section className="surface recent-panel enter enter-delay-3"><div className="panel-heading"><div><h2>Recently submitted</h2><p>Requests entering the system across your team.</p></div><Link href="/requests" className="text-link">View all <ArrowRight size={14} /></Link></div><RequestTable requests={summary?.recentRequests?.slice(0, 5) || []} /></section>
+    <section className="surface recent-panel enter enter-delay-3"><div className="panel-heading"><div><h2>Overdue across the workspace</h2><p>Requests that have waited longer than their stage allows.</p></div><Link href="/requests" className="text-link">All requests <ArrowRight size={14} /></Link></div>{overdue.length ? <div className="task-list">{overdue.map(task => <Link href={`/requests/${task.id}`} key={task.id} className="task-row"><div className="task-symbol symbol-clarify"><Clock3 size={17} /></div><div className="task-main"><div><b>{task.workflowName}</b><span className="task-code mono">{task.requestCode}</span></div><small>{task.requesterName} <i /> {task.currentStageName}</small></div><div className="task-due overdue"><Clock3 size={13} />{formatDate(task.dueAt)}</div><ChevronRight className="row-arrow" size={16} /></Link>)}</div> : <EmptyState title="Nothing overdue" body="Every open request is still within its stage SLA." />}</section>
+    <RecentPanel summary={summary} />
+  </></LoadState>;
+}
+
+function BuilderOverview({ user }: { user?: CurrentUser }) {
+  const query = useGetDashboard(); const workflows = useListWorkflows(); const summary = query.data;
+  const list = workflows.data || [];
+  const live = list.filter(wf => wf.status === 'active').length; const drafts = list.filter(wf => wf.status === 'draft').length;
+  const totalRequests = list.reduce((sum, wf) => sum + wf.requestCount, 0);
+  const recent = [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 6);
+  return <LoadState loading={query.isLoading || workflows.isLoading} error={query.isError || workflows.isError} retry={() => { void query.refetch(); void workflows.refetch(); }}><>
+    <PageHeading eyebrow={todayEyebrow('builder')} title={greeting(user?.name)} description="Shape the processes your team runs on. Here’s how your workflows are doing." action={<><Link href="/workflow-templates" className="button button-outline inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><Sparkles size={16} /> Templates</Link><Link href="/workflows/new" className="button button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><Plus size={16} /> New workflow</Link></>} />
+    <section className="summary-grid enter enter-delay-1">
+      <div className="summary-card focus-card"><div className="summary-label">LIVE WORKFLOWS <WorkflowIcon size={14} /></div><b>{live}<small> / {list.length}</small></b><span><i className="mini-dot orange" /> {drafts} draft{drafts === 1 ? '' : 's'} waiting to publish</span></div>
+      <div className="summary-card"><div className="summary-label">REQUESTS RUN <Activity size={14} /></div><b>{totalRequests}</b><span>Submitted through your workflows</span></div>
+      <div className="summary-card"><div className="summary-label">DECISIONS ON YOU <ListChecks size={14} /></div><b>{summary?.pendingCount ?? 0}</b><span>{summary?.overdueCount ?? 0} overdue</span></div>
+    </section>
+    <section className="surface recent-panel mb-4 enter enter-delay-2"><div className="panel-heading"><div><h2>Your workflows</h2><p>Recently edited first. Open one to refine its form or stages.</p></div><Link href="/workflows" className="text-link">All workflows <ArrowRight size={14} /></Link></div>
+      {recent.length ? <div className="overview-workflows">{recent.map(wf => <Link key={wf.id} href={`/workflows/${encodeURIComponent(wf.id)}/edit`} className="overview-workflow" data-testid={`overview-workflow-${wf.id}`}><div className="flex items-center justify-between"><span className="workflow-glyph"><GitBranch size={17} /></span><StatusPill status={wf.status} /></div><b>{wf.name}</b><p>{wf.description || wf.category}</p><small><span>{wf.stages.length} stage{wf.stages.length === 1 ? '' : 's'} · {wf.fields.length} field{wf.fields.length === 1 ? '' : 's'}</span><span>{wf.requestCount} requests</span></small></Link>)}</div> : <EmptyState title="No workflows yet" body="Start from a template or build one from scratch." action={<Link href="/workflows/new" className="button button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><Plus size={15} /> New workflow</Link>} />}
+    </section>
+    <div className="dashboard-columns enter enter-delay-3">
+      <TaskPanel summary={summary} title="Decisions waiting on you" description="Approvals assigned to you across every workflow." />
+      <aside className="dashboard-side"><ProgressNote summary={summary} /></aside>
+    </div>
+  </></LoadState>;
+}
+
+function RequesterOverview({ user }: { user?: CurrentUser }) {
+  const params = { scope: 'mine' as const };
+  const mine = useListRequests(params, { query: { queryKey: getListRequestsQueryKey(params), refetchInterval: 15000 } });
+  const workflows = useListWorkflows();
+  const requests = mine.data || [];
+  const inReview = requests.filter(r => r.status === 'submitted' || r.status === 'pending_approval');
+  const needsMe = requests.filter(r => r.status === 'needs_clarification');
+  const done = requests.filter(r => r.status === 'approved' || r.status === 'completed');
+  const available = (workflows.data || []).filter(wf => wf.status === 'active').slice(0, 6);
+  const sorted = [...requests].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  return <LoadState loading={mine.isLoading} error={mine.isError} retry={() => void mine.refetch()}><>
+    <PageHeading eyebrow={todayEyebrow('requester')} title={greeting(user?.name)} description="Ask for what you need and follow it to a decision, step by step." action={<Link href="/requests" className="button button-primary inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"><Plus size={16} /> New request</Link>} />
+    {needsMe.length > 0 && <Link href={`/requests/${needsMe[0].id}`} className="overview-callout enter"><CircleHelp size={18} /><span><b>{needsMe.length === 1 ? 'A request needs more detail from you' : `${needsMe.length} requests need more detail from you`}</b><small>An approver asked a question on {needsMe[0].workflowName} ({needsMe[0].requestCode}).</small></span><ArrowRight size={16} /></Link>}
+    <section className="summary-grid enter enter-delay-1">
+      <div className="summary-card focus-card"><div className="summary-label">IN REVIEW <Clock3 size={14} /></div><b>{inReview.length}</b><span>Moving through approval stages</span></div>
+      <div className="summary-card"><div className="summary-label">APPROVED <CheckCircle2 size={14} /></div><b>{done.length}</b><span>Ready to go</span></div>
+      <div className="summary-card"><div className="summary-label">DECLINED <XCircle size={14} /></div><b>{requests.filter(r => r.status === 'rejected').length}</b><span>See the reason on each request</span></div>
+    </section>
+    <div className="dashboard-columns enter enter-delay-2">
+      <section className="surface task-panel"><div className="panel-heading"><div><h2>My requests</h2><p>Where each of your requests is right now.</p></div><Link href="/requests" className="text-link">View all <ArrowRight size={14} /></Link></div>
+        {sorted.length ? <div className="task-list">{sorted.slice(0, 8).map(request => { const finished = ['approved', 'completed', 'rejected'].includes(request.status); const pct = finished ? 100 : request.totalStages ? Math.round(((request.currentStage - 1) / request.totalStages) * 100) : 0; return <Link href={`/requests/${request.id}`} key={request.id} className="task-row" data-testid={`my-request-${request.id}`}><div className={cx('task-symbol', request.status === 'needs_clarification' && 'symbol-clarify')}>{request.status === 'needs_clarification' ? <CircleHelp size={17} /> : <FileCheck2 size={17} />}</div><div className="task-main"><div><b>{request.workflowName}</b><span className="task-code mono">{request.requestCode}</span></div><small>{finished ? `Finished ${timeAgo(request.updatedAt).toLowerCase()}` : `Step ${request.currentStage} of ${request.totalStages} · ${request.currentStageName}`}</small><div className={cx('overview-meter', request.status === 'rejected' && 'meter-rejected')}><i style={{ width: `${Math.max(4, pct)}%` }} /></div></div><StatusPill status={request.status} /><ChevronRight className="row-arrow" size={16} /></Link>; })}</div> : <EmptyState title="You haven’t asked for anything yet" body="Pick a workflow to submit your first request." />}
+      </section>
+      <aside className="dashboard-side"><section className="surface side-widget"><div className="widget-head"><div><span className="section-label">START SOMETHING</span><h2>What do you need?</h2></div></div>{available.length ? <div className="shortcut-list">{available.map(wf => <Link href={`/workflows/${encodeURIComponent(wf.id)}/requests`} key={wf.id} className="shortcut" data-testid={`start-workflow-${wf.id}`}><span className="shortcut-icon"><Plus size={16} /></span><span><b>{wf.name}</b><small>{wf.category}</small></span><ArrowRight size={14} /></Link>)}</div> : <div className="widget-empty">No workflows are open for requests yet.</div>}</section></aside>
+    </div>
   </></LoadState>;
 }
 
