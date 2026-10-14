@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { QueryClient } from "@tanstack/react-query";
 import { resendUserInvitation } from "@workspace/api-client-react";
-import { invitationDeliveryError, shouldRetryInvitation } from "./invitation-delivery";
+import { invitationCreationError, invitationDeliveryError, shouldRetryInvitation } from "./invitation-delivery";
 
 test("lost resend response retries with the same operation key and credentials", async t => {
   const requests: RequestInit[] = [];
@@ -38,4 +38,11 @@ test("permanent errors are not retried and offline failures have actionable text
   assert.equal(shouldRetryInvitation(0, new Error("HTTP 409 delivery failed")), false);
   assert.match(invitationDeliveryError(new TypeError("Failed to fetch")), /retry.*not send a duplicate/i);
   assert.equal(invitationDeliveryError(new Error("Already registered")), "Already registered");
+});
+
+test("new invitation form shows the server reason and distinguishes connection failures", () => {
+  const reason = "This email address already has a FlowBuilder account.";
+  assert.equal(invitationCreationError(Object.assign(new Error("HTTP 409"), { data: { error: reason } })), reason);
+  assert.equal(invitationCreationError(Object.assign(new Error("HTTP 403"), { data: { error: "Workspace member limit reached." } })), "Workspace member limit reached.");
+  assert.match(invitationCreationError(new TypeError("Failed to fetch")), /reach the server/);
 });

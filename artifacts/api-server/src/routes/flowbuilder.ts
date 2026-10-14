@@ -1,5 +1,6 @@
 import { syncApprovedStaff } from "../lib/staff-register";
 import { invitationRedirectUrl } from "../lib/invitation-redirect";
+import { invitationCreationError } from "../lib/invitation-errors";
 import {
   ResendUserInvitationBody,
   ResendUserInvitationResponse,
@@ -2121,8 +2122,7 @@ router.post("/users", async (req, res): Promise<void> => {
   } catch (error) {
     req.log.warn({ error, email }, "Unable to send workspace invitation");
     res.status(409).json({
-      error:
-        "The invitation could not be sent. Check that the email is not already registered.",
+      error: invitationCreationError(error),
     });
     return;
   }

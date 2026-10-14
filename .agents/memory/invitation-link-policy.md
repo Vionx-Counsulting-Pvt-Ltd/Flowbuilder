@@ -26,3 +26,9 @@ Invitation delivery and browser confirmation are separate outcomes. Connection f
 **Why:** A member saw “Failed to fetch” even though a resend had succeeded in server logs. The exact network failure was not reproduced; treating that message as proof of delivery failure risks duplicate emails and invalidating the link just sent.
 
 **How to apply:** Reuse the same operation key for transport retries, record completed delivery atomically with the saved invitation, and serialize retries for the same member. Retry transport failures only, not authentication or provider rejections. Do not claim the original connection fault was reproduced.
+
+Do not resolve a registered-email invitation failure by silently reassigning the existing account to the inviter's workspace or bypassing the provider's duplicate-account guard.
+
+**Why:** An address rejected as taken was already linked to a workspace account. Changing its workspace association could remove existing access or expose another company's data.
+
+**How to apply:** Explain the registered-account reason clearly. Adding existing-account access or supporting multiple workspaces requires an explicit product decision, not an invitation-error workaround.
