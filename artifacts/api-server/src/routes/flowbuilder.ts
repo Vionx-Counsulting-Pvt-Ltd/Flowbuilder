@@ -1,3 +1,4 @@
+import { syncApprovedStaff } from "../lib/staff-register";
 import {
   ActOnRequestBody,
   ActOnRequestParams,
@@ -1943,7 +1944,8 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
       const dueHours = nextGroup.length
         ? Math.min(...nextGroup.map((stage) => stage.slaHours))
         : null;
-      const [changed] = await db
+      const changed = await db.transaction(async tx => {
+      const [changed] = await tx
         .update(requestsTable)
         .set({
           approvedStageIds: currentGroupComplete ? [] : approvedStageIds,
@@ -1964,6 +1966,9 @@ router.post("/requests/:requestId/actions", async (req, res): Promise<void> => {
           updatedAt: actionUpdatedAt,
         })
         .where(actionGuard).returning({ id: requestsTable.id });
+      if (changed && finalStatus === "approved") await syncApprovedStaff(member.tenantId, request.workflowId, tx);
+      return changed;
+      });
       if (!changed) { res.status(409).json({ error: "The request changed. Refresh before trying again." }); return; }
       await recordAudit({
         tenantId: member.tenantId,

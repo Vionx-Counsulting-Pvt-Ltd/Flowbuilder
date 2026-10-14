@@ -24,6 +24,7 @@ import type {
 } from '@workspace/api-client-react';
 import WorkflowEditor from './WorkflowEditor';
 import VionxLanding from './pages/VionxLanding';
+import StaffOnboardingTabs, { type StaffTab } from './components/StaffOnboardingTabs';
 import RequestFormModal from './components/RequestFormModal';
 import RequestAttachments from './components/RequestAttachments';
 import RequestDecisionCard from './components/RequestDecisionCard';
@@ -409,18 +410,21 @@ function WorkflowTemplatesPage() {
 }
 
 function RequestsPage() {
-  const qc = useQueryClient(); const workflows = useListWorkflows(); const current = useGetCurrentUser(); const [status, setStatus] = useState('All statuses'); const [search, setSearch] = useState(''); const [create, setCreate] = useState(false);
+  const qc = useQueryClient(); const workflows = useListWorkflows(); const current = useGetCurrentUser(); const [status, setStatus] = useState('All statuses'); const [search, setSearch] = useState(''); const [create, setCreate] = useState(false); const [staffTab, setStaffTab] = useState<StaffTab>('dashboard');
   const { workflowId } = useParams<{ workflowId?: string }>();
   const workflow = useGetWorkflow(workflowId ?? '', { query: { queryKey: getGetWorkflowQueryKey(workflowId ?? ''), enabled: Boolean(workflowId), staleTime: 0 } });
-  useEffect(() => { setCreate(false); setSearch(''); setStatus('All statuses'); }, [workflowId]);
+  useEffect(() => { setCreate(false); setSearch(''); setStatus('All statuses'); setStaffTab('dashboard'); }, [workflowId]);
   const params = useMemo(() => ({ ...(workflowId ? { workflowId, scope: 'mine' as const } : {}), ...(status !== 'All statuses' ? { status: status.replaceAll(' ', '_') as RequestStatus } : {}), ...(search.trim() ? { search: search.trim() } : {}) }), [workflowId, status, search]);
   const query = useListRequests(params, { query: { queryKey: getListRequestsQueryKey(params), enabled: !workflowId || Boolean(workflow.data), staleTime: 0, refetchOnMount: 'always', refetchInterval: 15000 } });
+  const isStaff = Boolean(workflowId) && (workflow.data?.name ?? '').toLowerCase().replace(/[\s_-]+/g, '') === 'staffonboarding';
   if (workflowId && workflow.isLoading) return <Skeleton rows={3} />;
   if (workflowId && workflow.isError) return <LoadState loading={false} error retry={() => void workflow.refetch()}>{null}</LoadState>;
-   return <>{workflowId && <Link href="/dashboard" className="inline-flex items-center gap-1 mb-3 text-sm text-muted-foreground"><ChevronLeft size={15} /> Dashboard</Link>}<PageHeading eyebrow={workflowId ? "MY WORKFLOW REQUESTS" : "EVERY REQUEST, ONE CLEAR VIEW"} title={workflowId ? workflow.data?.name ?? 'Workflow requests' : 'Requests'} description={workflowId ? 'Your requests for this workflow. Open a request to view its details, or start a new one.' : "Follow each request from its first question to its final decision."} action={current.data?.permissions.includes('create') && (!workflowId || workflow.data?.status === 'active') && <Button data-testid="button-new-request" onClick={() => setCreate(true)}><Plus size={16} /> New request</Button>} />
+   return <>{workflowId && <Link href="/dashboard" className="inline-flex items-center gap-1 mb-3 text-sm text-muted-foreground"><ChevronLeft size={15} /> Dashboard</Link>}<PageHeading eyebrow={workflowId ? "MY WORKFLOW REQUESTS" : "EVERY REQUEST, ONE CLEAR VIEW"} title={workflowId ? workflow.data?.name ?? 'Workflow requests' : 'Requests'} description={workflowId ? 'Your requests for this workflow. Open a request to view its details, or start a new one.' : "Follow each request from its first question to its final decision."} action={current.data?.permissions.includes('create') && (!isStaff || staffTab === 'dashboard') && (!workflowId || workflow.data?.status === 'active') && <Button data-testid="button-new-request" onClick={() => setCreate(true)}><Plus size={16} /> New request</Button>} />
     {workflowId && workflow.data?.status !== 'active' && <p className="text-sm text-muted-foreground mb-3">This workflow is not published. Existing requests remain available, but new requests cannot be submitted.</p>}
+    {(() => { const dash = <>
     <div className="list-toolbar"><label className="searchbox wide"><Search size={16} /><input aria-label="Search requests" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by request, workflow or person…" /></label><div className="select-with-icon"><Filter size={15} /><SelectInput aria-label="Filter request status" value={status} onChange={e => setStatus(e.target.value)}><option>All statuses</option><option>Submitted</option><option>Pending approval</option><option>Needs clarification</option><option>Approved</option><option>Rejected</option><option>Completed</option></SelectInput></div></div>
     <LoadState loading={query.isLoading} error={query.isError} retry={() => void query.refetch()}><section className="surface"><RequestTable requests={query.data || []} /></section></LoadState>
+</>; return isStaff && workflowId ? <StaffOnboardingTabs workflowId={workflowId} dashboard={dash} onTabChange={setStaffTab} /> : dash; })()}
      {create && <RequestFormModal key={workflowId ?? 'all'} initialWorkflowId={workflowId} workflows={workflowId ? workflow.data ? [workflow.data] : [] : workflows.data || []} onClose={() => { setCreate(false); invalidate(qc, [getListRequestsQueryKey(), getGetDashboardQueryKey()]); }} />}
   </>;
 }

@@ -8,6 +8,277 @@
 import * as zod from 'zod';
 
 
+export const ListWorkflowStaffParams = zod.object({
+  "workflowId": zod.coerce.string()
+})
+
+
+
+export const listWorkflowStaffResponseStaffItemFieldsItemReferenceMappingsMax = 50;
+
+export const listWorkflowStaffResponseStaffItemFieldsItemWidthMax = 6;
+
+export const listWorkflowStaffResponseStaffItemFieldsItemMinLengthMin = 0;
+
+export const listWorkflowStaffResponseStaffItemFieldsItemMaxLengthMin = 0;
+
+export const listWorkflowStaffResponseStaffItemFieldsItemMaxFilesMax = 10;
+
+export const listWorkflowStaffResponseStaffItemFieldsItemMaxFileSizeMBMax = 25;
+
+
+
+export const ListWorkflowStaffResponse = zod.object({
+  "canManage": zod.boolean(),
+  "canAssignManagers": zod.boolean(),
+  "managerIds": zod.array(zod.string()),
+  "staff": zod.array(zod.object({
+  "id": zod.string(),
+  "requestId": zod.number().int(),
+  "name": zod.string(),
+  "branch": zod.string(),
+  "region": zod.string(),
+  "designation": zod.string(),
+  "status": zod.enum(['active', 'inactive']),
+  "fields": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['text', 'textarea', 'longtext', 'name', 'email', 'phone', 'url', 'address', 'number', 'decimal', 'percent', 'price', 'date', 'time', 'datetime', 'duration', 'select', 'enum', 'multiselect', 'enumlist', 'checkbox', 'yesno', 'radio', 'progress', 'ref', 'file', 'image', 'thumbnail', 'drawing', 'signature', 'video', 'people', 'lookup', 'color', 'latlong', 'location', 'xy', 'show']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().nullish(),
+  "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(listWorkflowStaffResponseStaffItemFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "initialValueExpression": zod.string().nullish(),
+  "appFormula": zod.string().nullish(),
+  "showIf": zod.string().nullish(),
+  "requiredIf": zod.string().nullish(),
+  "validIf": zod.string().nullish(),
+  "invalidMessage": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(listWorkflowStaffResponseStaffItemFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(listWorkflowStaffResponseStaffItemFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(listWorkflowStaffResponseStaffItemFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(listWorkflowStaffResponseStaffItemFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(listWorkflowStaffResponseStaffItemFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
+})),
+  "values": zod.record(zod.string(), zod.unknown()),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+export const SetStaffManagersParams = zod.object({
+  "workflowId": zod.coerce.string()
+})
+
+export const setStaffManagersBodyUserIdsMax = 100;
+
+
+
+export const SetStaffManagersBody = zod.object({
+  "userIds": zod.array(zod.string()).max(setStaffManagersBodyUserIdsMax)
+})
+
+
+
+export const setStaffManagersResponseStaffItemFieldsItemReferenceMappingsMax = 50;
+
+export const setStaffManagersResponseStaffItemFieldsItemWidthMax = 6;
+
+export const setStaffManagersResponseStaffItemFieldsItemMinLengthMin = 0;
+
+export const setStaffManagersResponseStaffItemFieldsItemMaxLengthMin = 0;
+
+export const setStaffManagersResponseStaffItemFieldsItemMaxFilesMax = 10;
+
+export const setStaffManagersResponseStaffItemFieldsItemMaxFileSizeMBMax = 25;
+
+
+
+export const SetStaffManagersResponse = zod.object({
+  "canManage": zod.boolean(),
+  "canAssignManagers": zod.boolean(),
+  "managerIds": zod.array(zod.string()),
+  "staff": zod.array(zod.object({
+  "id": zod.string(),
+  "requestId": zod.number().int(),
+  "name": zod.string(),
+  "branch": zod.string(),
+  "region": zod.string(),
+  "designation": zod.string(),
+  "status": zod.enum(['active', 'inactive']),
+  "fields": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['text', 'textarea', 'longtext', 'name', 'email', 'phone', 'url', 'address', 'number', 'decimal', 'percent', 'price', 'date', 'time', 'datetime', 'duration', 'select', 'enum', 'multiselect', 'enumlist', 'checkbox', 'yesno', 'radio', 'progress', 'ref', 'file', 'image', 'thumbnail', 'drawing', 'signature', 'video', 'people', 'lookup', 'color', 'latlong', 'location', 'xy', 'show']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().nullish(),
+  "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(setStaffManagersResponseStaffItemFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "initialValueExpression": zod.string().nullish(),
+  "appFormula": zod.string().nullish(),
+  "showIf": zod.string().nullish(),
+  "requiredIf": zod.string().nullish(),
+  "validIf": zod.string().nullish(),
+  "invalidMessage": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(setStaffManagersResponseStaffItemFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(setStaffManagersResponseStaffItemFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(setStaffManagersResponseStaffItemFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(setStaffManagersResponseStaffItemFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(setStaffManagersResponseStaffItemFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
+})),
+  "values": zod.record(zod.string(), zod.unknown()),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+export const UpdateStaffMemberParams = zod.object({
+  "workflowId": zod.coerce.string(),
+  "staffId": zod.coerce.string()
+})
+
+export const UpdateStaffMemberBody = zod.object({
+  "status": zod.enum(['active', 'inactive']),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "values": zod.record(zod.string(), zod.unknown())
+})
+
+
+
+export const updateStaffMemberResponseFieldsItemReferenceMappingsMax = 50;
+
+export const updateStaffMemberResponseFieldsItemWidthMax = 6;
+
+export const updateStaffMemberResponseFieldsItemMinLengthMin = 0;
+
+export const updateStaffMemberResponseFieldsItemMaxLengthMin = 0;
+
+export const updateStaffMemberResponseFieldsItemMaxFilesMax = 10;
+
+export const updateStaffMemberResponseFieldsItemMaxFileSizeMBMax = 25;
+
+
+
+export const UpdateStaffMemberResponse = zod.object({
+  "id": zod.string(),
+  "requestId": zod.number().int(),
+  "name": zod.string(),
+  "branch": zod.string(),
+  "region": zod.string(),
+  "designation": zod.string(),
+  "status": zod.enum(['active', 'inactive']),
+  "fields": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "type": zod.enum(['text', 'textarea', 'longtext', 'name', 'email', 'phone', 'url', 'address', 'number', 'decimal', 'percent', 'price', 'date', 'time', 'datetime', 'duration', 'select', 'enum', 'multiselect', 'enumlist', 'checkbox', 'yesno', 'radio', 'progress', 'ref', 'file', 'image', 'thumbnail', 'drawing', 'signature', 'video', 'people', 'lookup', 'color', 'latlong', 'location', 'xy', 'show']),
+  "required": zod.boolean(),
+  "placeholder": zod.string().nullish(),
+  "options": zod.array(zod.string()).optional(),
+  "sourceTableId": zod.string().nullish(),
+  "sourceLabelColumn": zod.string().nullish(),
+  "referenceMappings": zod.array(zod.object({
+  "sourceColumn": zod.string().min(1),
+  "targetFieldId": zod.string().min(1),
+  "mode": zod.enum(['suggestion', 'locked'])
+})).max(updateStaffMemberResponseFieldsItemReferenceMappingsMax).optional(),
+  "optionMappedValues": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean()]).nullable())).optional().describe('Server-owned projection containing only explicitly mapped target answers.'),
+  "referenceColumns": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})).optional(),
+  "referenceData": zod.record(zod.string(), zod.record(zod.string(), zod.union([zod.string(),zod.number(),zod.boolean(),zod.null()]))).optional(),
+  "optionLabels": zod.record(zod.string(), zod.string()).optional(),
+  "key": zod.string().nullish(),
+  "helpText": zod.string().nullish(),
+  "readOnly": zod.boolean().optional(),
+  "hidden": zod.boolean().optional(),
+  "defaultValue": zod.string().nullish(),
+  "initialValueExpression": zod.string().nullish(),
+  "appFormula": zod.string().nullish(),
+  "showIf": zod.string().nullish(),
+  "requiredIf": zod.string().nullish(),
+  "validIf": zod.string().nullish(),
+  "invalidMessage": zod.string().nullish(),
+  "width": zod.number().int().min(1).max(updateStaffMemberResponseFieldsItemWidthMax).optional(),
+  "prefix": zod.string().nullish(),
+  "suffix": zod.string().nullish(),
+  "min": zod.number().nullish(),
+  "max": zod.number().nullish(),
+  "minLength": zod.number().int().min(updateStaffMemberResponseFieldsItemMinLengthMin).nullish(),
+  "maxLength": zod.number().int().min(updateStaffMemberResponseFieldsItemMaxLengthMin).nullish(),
+  "multiple": zod.boolean().optional(),
+  "accept": zod.string().nullish(),
+  "maxFiles": zod.number().int().min(1).max(updateStaffMemberResponseFieldsItemMaxFilesMax).optional(),
+  "maxFileSizeMB": zod.number().int().min(1).max(updateStaffMemberResponseFieldsItemMaxFileSizeMBMax).optional(),
+  "displayCondition": zod.union([zod.null(),zod.object({
+  "fieldId": zod.string(),
+  "operator": zod.enum(['equals', 'notEquals', 'contains']),
+  "value": zod.string()
+})]).optional()
+})),
+  "values": zod.record(zod.string(), zod.unknown()),
+  "updatedAt": zod.coerce.date()
+})
+
+
 /**
  * @summary List reusable tables in the current workspace
  */

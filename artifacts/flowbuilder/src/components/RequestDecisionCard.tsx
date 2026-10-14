@@ -15,13 +15,13 @@ export default function RequestDecisionCard({ request, pending, onEdit, onAction
       <h2>Returned for correction.</h2>
       <p>{request.canEdit ? "Correct the form and resubmit it for a new approval round." : "Only the original requester or a workspace admin can edit this request."}</p>
       {reason && <p className="rounded-lg bg-muted p-3 text-sm" data-testid="return-reason">{reason}</p>}
-      {request.canEdit && <button className="button button-primary w-full" data-testid="button-edit-returned-request" disabled={pending} onClick={onEdit}>Edit and resubmit <CircleHelp size={16} /></button>}
+      {request.canEdit && <button type="button" className="button button-primary w-full" data-testid="button-edit-returned-request" disabled={pending} onClick={onEdit}><CircleHelp size={16} /><span>Edit and resubmit</span></button>}
     </> : request.canApprove ? <>
       <h2>Help this move forward.</h2>
       <p>Review the request, or send it back with a clear correction note.</p>
-      <button className="button button-primary w-full" disabled={pending} onClick={() => onAction("approve")}><Check size={16} /> Approve request</button>
-      <button className="button button-outline mt-2 w-full" data-testid="button-send-back-request" disabled={pending} onClick={() => onAction("request_clarification")}><CircleHelp size={16} /> Send back for correction</button>
-      <button className="button button-danger mt-2 w-full" disabled={pending} onClick={() => onAction("reject")}><XCircle size={16} /> Reject request</button>
+      <button type="button" className="button button-primary w-full" data-testid="button-approve-request" disabled={pending} onClick={() => onAction("approve")}><Check size={16} /><span>Approve request</span></button>
+      <button type="button" className="button button-outline mt-2 w-full" data-testid="button-send-back-request" disabled={pending} onClick={() => onAction("request_clarification")}><CircleHelp size={16} /><span>Send back for correction</span></button>
+      <button type="button" className="button button-danger mt-2 w-full" data-testid="button-reject-request" disabled={pending} onClick={() => onAction("reject")}><XCircle size={16} /><span>Reject request</span></button>
     </> : ["approved", "completed", "rejected"].includes(request.status) ? <>
       <h2>{request.status === "rejected" ? "Request rejected." : request.status === "completed" ? "Request completed." : "Request approved."}</h2>
       <p>This request is closed for editing. Its details and activity history remain available.</p>

@@ -47,6 +47,10 @@ import type {
   RequestSummary,
   RoleInput,
   RoleUpdate,
+  StaffManagerInput,
+  StaffMember,
+  StaffMemberUpdate,
+  StaffRegister,
   UploadUrlRequest,
   UploadUrlResponse,
   UserInput,
@@ -84,6 +88,245 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListWorkflowStaffUrl = (workflowId: string,) => {
+
+
+
+
+  return `/api/workflows/${workflowId}/staff`
+}
+
+export const listWorkflowStaff = async (workflowId: string, options?: Parameters<typeof customFetch>[1]): Promise<StaffRegister> => {
+
+  return customFetch<StaffRegister>(getListWorkflowStaffUrl(workflowId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWorkflowStaffQueryKey = (workflowId: string,) => {
+    return [
+    `/api/workflows/${workflowId}/staff`
+    ] as const;
+    }
+
+
+export const getListWorkflowStaffQueryOptions = <TData = Awaited<ReturnType<typeof listWorkflowStaff>>, TError = ErrorType<unknown>>(workflowId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkflowStaff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWorkflowStaffQueryKey(workflowId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkflowStaff>>> = ({ signal }) => listWorkflowStaff(workflowId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: workflowId !== null && workflowId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkflowStaff>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWorkflowStaffQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkflowStaff>>>
+export type ListWorkflowStaffQueryError = ErrorType<unknown>
+
+
+
+export function useListWorkflowStaff<TData = Awaited<ReturnType<typeof listWorkflowStaff>>, TError = ErrorType<unknown>>(
+ workflowId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkflowStaff>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWorkflowStaffQueryOptions(workflowId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetStaffManagersUrl = (workflowId: string,) => {
+
+
+
+
+  return `/api/workflows/${workflowId}/staff/managers`
+}
+
+export const setStaffManagers = async (workflowId: string,
+    staffManagerInput: StaffManagerInput, options?: Parameters<typeof customFetch>[1]): Promise<StaffRegister> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StaffRegister>(getSetStaffManagersUrl(workflowId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(staffManagerInput)
+  }
+);}
+
+
+
+
+
+export const getSetStaffManagersMutationKey = () => ['setStaffManagers'] as const;
+
+export const getSetStaffManagersMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setStaffManagers>>, TError,SetStaffManagersMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setStaffManagers>>, TError,SetStaffManagersMutationVariables, TContext> => {
+
+const mutationKey = getSetStaffManagersMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setStaffManagers>>, SetStaffManagersMutationVariables> = (props) => {
+          const {workflowId,data} = props ?? {};
+
+          return  setStaffManagers(workflowId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetStaffManagersMutationResult = NonNullable<Awaited<ReturnType<typeof setStaffManagers>>>
+    export type SetStaffManagersMutationBody = BodyType<StaffManagerInput>
+    export type SetStaffManagersMutationError = ErrorType<unknown>
+    export type SetStaffManagersMutationVariables = {workflowId: string;data: BodyType<StaffManagerInput>}
+
+    export const useSetStaffManagers = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setStaffManagers>>, TError,SetStaffManagersMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setStaffManagers>>,
+        TError,
+        SetStaffManagersMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetStaffManagersMutationOptions(options));
+    }
+
+export const getUpdateStaffMemberUrl = (workflowId: string,
+    staffId: string,) => {
+
+
+
+
+  return `/api/workflows/${workflowId}/staff/${staffId}`
+}
+
+export const updateStaffMember = async (workflowId: string,
+    staffId: string,
+    staffMemberUpdate: StaffMemberUpdate, options?: Parameters<typeof customFetch>[1]): Promise<StaffMember> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StaffMember>(getUpdateStaffMemberUrl(workflowId,staffId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(staffMemberUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateStaffMemberMutationKey = () => ['updateStaffMember'] as const;
+
+export const getUpdateStaffMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStaffMember>>, TError,UpdateStaffMemberMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateStaffMember>>, TError,UpdateStaffMemberMutationVariables, TContext> => {
+
+const mutationKey = getUpdateStaffMemberMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStaffMember>>, UpdateStaffMemberMutationVariables> = (props) => {
+          const {workflowId,staffId,data} = props ?? {};
+
+          return  updateStaffMember(workflowId,staffId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateStaffMemberMutationResult = NonNullable<Awaited<ReturnType<typeof updateStaffMember>>>
+    export type UpdateStaffMemberMutationBody = BodyType<StaffMemberUpdate>
+    export type UpdateStaffMemberMutationError = ErrorType<unknown>
+    export type UpdateStaffMemberMutationVariables = {workflowId: string;staffId: string;data: BodyType<StaffMemberUpdate>}
+
+    export const useUpdateStaffMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStaffMember>>, TError,UpdateStaffMemberMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateStaffMember>>,
+        TError,
+        UpdateStaffMemberMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateStaffMemberMutationOptions(options));
+    }
 
 export const getListReferenceTablesUrl = () => {
 

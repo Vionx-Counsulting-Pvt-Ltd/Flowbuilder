@@ -14,3 +14,4 @@
 - [Request correction policy](request-correction-policy.md) — only returned requests are editable by their requester or workspace admins; corrected data must restart approval.
 - [PostgreSQL timestamp precision](postgres-timestamp-precision.md) — optimistic timestamp guards must use consistent precision and strictly monotonic update versions.
 - [Workflow shortcut navigation](workflow-shortcut-navigation.md) — dashboard shortcuts open personal workflow request tables, with New request opening a context-fixed popup.
+- [Staff register policy](staff-register-policy.md) — final approval creates active staff; admins designate staff managers, and Evaluation is deferred.

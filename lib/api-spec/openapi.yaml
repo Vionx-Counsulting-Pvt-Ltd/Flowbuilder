@@ -17,6 +17,53 @@ tags:
   - name: storage
   - name: platform
 paths:
+  /workflows/{workflowId}/staff:
+    parameters:
+      - { name: workflowId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listWorkflowStaff
+      tags: [workflows]
+      responses:
+        "200":
+          description: Staff register and permissions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StaffRegister" }
+  /workflows/{workflowId}/staff/managers:
+    parameters:
+      - { name: workflowId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setStaffManagers
+      tags: [workflows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffManagerInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StaffRegister" }
+  /workflows/{workflowId}/staff/{staffId}:
+    parameters:
+      - { name: workflowId, in: path, required: true, schema: { type: string } }
+      - { name: staffId, in: path, required: true, schema: { type: string } }
+    patch:
+      operationId: updateStaffMember
+      tags: [workflows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffMemberUpdate" }
+      responses:
+        "200":
+          description: Updated staff member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StaffMember" }
   /reference-tables:
     get:
       operationId: listReferenceTables
@@ -687,6 +734,54 @@ paths:
         "403": { description: Platform administrator access required }
 components:
   schemas:
+    StaffManagerInput:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string }
+    StaffMemberUpdate:
+      type: object
+      required: [status, values, expectedUpdatedAt]
+      properties:
+        status: { type: string, enum: [active, inactive] }
+        expectedUpdatedAt: { type: string, format: date-time }
+        values:
+          type: object
+          additionalProperties: {}
+    StaffMember:
+      type: object
+      required: [id, requestId, name, branch, region, designation, status, fields, values, updatedAt]
+      properties:
+        id: { type: string }
+        requestId: { type: integer }
+        name: { type: string }
+        branch: { type: string }
+        region: { type: string }
+        designation: { type: string }
+        status: { type: string, enum: [active, inactive] }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/WorkflowField" }
+        values:
+          type: object
+          additionalProperties: {}
+        updatedAt: { type: string, format: date-time }
+    StaffRegister:
+      type: object
+      required: [canManage, canAssignManagers, managerIds, staff]
+      properties:
+        canManage: { type: boolean }
+        canAssignManagers: { type: boolean }
+        managerIds:
+          type: array
+          items: { type: string }
+        staff:
+          type: array
+          items: { $ref: "#/components/schemas/StaffMember" }
     ReferenceColumn:
       type: object
       required: [key, label, type, required]

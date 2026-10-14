@@ -557,7 +557,10 @@
 .decision-card { padding: 18px; }
 .decision-card h2 { margin-top: 11px; color: #39494b; font-family: var(--app-font-serif); font-size: 16px; font-weight: 800; letter-spacing: -.035em; }
 .decision-card > p { margin: 7px 0 16px; color: #85908c; font-size: 10px; line-height: 1.65; }
-.decision-card button { padding: 9px; font-size: 10px; }
+.decision-card .button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; padding: 10px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; line-height: 1.4; transition: background .16s ease, box-shadow .16s ease; }
+.decision-card .button > svg { flex-shrink: 0; }
+.decision-card .button:disabled { opacity: .6; cursor: not-allowed; }
+.decision-card .button:focus-visible { outline: 2px solid #397e63; outline-offset: 3px; }
 .request-meta { display: flex; flex-direction: column; gap: 6px; border: 1px solid #e8e4d9; border-radius: 13px; padding: 16px; background: #f5f3ec; }
 .request-meta span { margin-top: 8px; color: #9aa19a; font-family: var(--app-font-mono); font-size: 8px; letter-spacing: .08em; }
 .request-meta span:first-child { margin-top: 0; }

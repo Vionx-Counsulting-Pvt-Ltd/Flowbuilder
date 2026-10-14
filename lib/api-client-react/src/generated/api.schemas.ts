@@ -5,6 +5,226 @@
  * FlowBuilder workflow, request, team, and reporting API
  * OpenAPI spec version: 0.2.0
  */
+export interface StaffManagerInput {
+  /** @maxItems 100 */
+  userIds: string[];
+}
+
+export type StaffMemberUpdateStatus = typeof StaffMemberUpdateStatus[keyof typeof StaffMemberUpdateStatus];
+
+
+export const StaffMemberUpdateStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+
+export type StaffMemberUpdateValues = {[key: string]: unknown};
+
+export interface StaffMemberUpdate {
+  status: StaffMemberUpdateStatus;
+  expectedUpdatedAt: string;
+  values: StaffMemberUpdateValues;
+}
+
+export type StaffMemberStatus = typeof StaffMemberStatus[keyof typeof StaffMemberStatus];
+
+
+export const StaffMemberStatus = {
+  active: 'active',
+  inactive: 'inactive',
+} as const;
+
+export type StaffMemberValues = {[key: string]: unknown};
+
+export type WorkflowFieldType = typeof WorkflowFieldType[keyof typeof WorkflowFieldType];
+
+
+export const WorkflowFieldType = {
+  text: 'text',
+  textarea: 'textarea',
+  longtext: 'longtext',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  url: 'url',
+  address: 'address',
+  number: 'number',
+  decimal: 'decimal',
+  percent: 'percent',
+  price: 'price',
+  date: 'date',
+  time: 'time',
+  datetime: 'datetime',
+  duration: 'duration',
+  select: 'select',
+  enum: 'enum',
+  multiselect: 'multiselect',
+  enumlist: 'enumlist',
+  checkbox: 'checkbox',
+  yesno: 'yesno',
+  radio: 'radio',
+  progress: 'progress',
+  ref: 'ref',
+  file: 'file',
+  image: 'image',
+  thumbnail: 'thumbnail',
+  drawing: 'drawing',
+  signature: 'signature',
+  video: 'video',
+  people: 'people',
+  lookup: 'lookup',
+  color: 'color',
+  latlong: 'latlong',
+  location: 'location',
+  xy: 'xy',
+  show: 'show',
+} as const;
+
+export type ReferenceFieldMappingMode = typeof ReferenceFieldMappingMode[keyof typeof ReferenceFieldMappingMode];
+
+
+export const ReferenceFieldMappingMode = {
+  suggestion: 'suggestion',
+  locked: 'locked',
+} as const;
+
+export interface ReferenceFieldMapping {
+  /** @minLength 1 */
+  sourceColumn: string;
+  /** @minLength 1 */
+  targetFieldId: string;
+  mode: ReferenceFieldMappingMode;
+}
+
+export interface ReferenceValues {[key: string]: string | number | boolean | null}
+
+export type FieldConditionOperator = typeof FieldConditionOperator[keyof typeof FieldConditionOperator];
+
+
+export const FieldConditionOperator = {
+  equals: 'equals',
+  notEquals: 'notEquals',
+  contains: 'contains',
+} as const;
+
+export interface FieldCondition {
+  fieldId: string;
+  operator: FieldConditionOperator;
+  value: string;
+}
+
+/**
+ * Server-owned projection containing only explicitly mapped target answers.
+ */
+export type WorkflowFieldOptionMappedValues = {[key: string]: {[key: string]: string | number | boolean | null}};
+
+export type WorkflowFieldReferenceColumnsItem = {
+  key: string;
+  label: string;
+};
+
+export type WorkflowFieldReferenceData = {[key: string]: ReferenceValues};
+
+export type WorkflowFieldOptionLabels = {[key: string]: string};
+
+export interface WorkflowField {
+  id: string;
+  label: string;
+  type: WorkflowFieldType;
+  required: boolean;
+  /** @nullable */
+  placeholder?: string | null;
+  options?: string[];
+  /** @nullable */
+  sourceTableId?: string | null;
+  /** @nullable */
+  sourceLabelColumn?: string | null;
+  /** @maxItems 50 */
+  referenceMappings?: ReferenceFieldMapping[];
+  /** Server-owned projection containing only explicitly mapped target answers. */
+  optionMappedValues?: WorkflowFieldOptionMappedValues;
+  referenceColumns?: WorkflowFieldReferenceColumnsItem[];
+  referenceData?: WorkflowFieldReferenceData;
+  optionLabels?: WorkflowFieldOptionLabels;
+  /** @nullable */
+  key?: string | null;
+  /** @nullable */
+  helpText?: string | null;
+  readOnly?: boolean;
+  hidden?: boolean;
+  /** @nullable */
+  defaultValue?: string | null;
+  /** @nullable */
+  initialValueExpression?: string | null;
+  /** @nullable */
+  appFormula?: string | null;
+  /** @nullable */
+  showIf?: string | null;
+  /** @nullable */
+  requiredIf?: string | null;
+  /** @nullable */
+  validIf?: string | null;
+  /** @nullable */
+  invalidMessage?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 6
+     */
+  width?: number;
+  /** @nullable */
+  prefix?: string | null;
+  /** @nullable */
+  suffix?: string | null;
+  /** @nullable */
+  min?: number | null;
+  /** @nullable */
+  max?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  minLength?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  maxLength?: number | null;
+  multiple?: boolean;
+  /** @nullable */
+  accept?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  maxFiles?: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  maxFileSizeMB?: number;
+  displayCondition?: null | FieldCondition;
+}
+
+export interface StaffMember {
+  id: string;
+  requestId: number;
+  name: string;
+  branch: string;
+  region: string;
+  designation: string;
+  status: StaffMemberStatus;
+  fields: WorkflowField[];
+  values: StaffMemberValues;
+  updatedAt: string;
+}
+
+export interface StaffRegister {
+  canManage: boolean;
+  canAssignManagers: boolean;
+  managerIds: string[];
+  staff: StaffMember[];
+}
+
 export type ReferenceColumnType = typeof ReferenceColumnType[keyof typeof ReferenceColumnType];
 
 
@@ -30,8 +250,6 @@ export interface ReferenceColumn {
   type: ReferenceColumnType;
   required: boolean;
 }
-
-export interface ReferenceValues {[key: string]: string | number | boolean | null}
 
 export interface ReferenceTableInput {
   /**
@@ -119,173 +337,6 @@ export const RoutingType = {
   parallel: 'parallel',
   conditional: 'conditional',
 } as const;
-
-export type ReferenceFieldMappingMode = typeof ReferenceFieldMappingMode[keyof typeof ReferenceFieldMappingMode];
-
-
-export const ReferenceFieldMappingMode = {
-  suggestion: 'suggestion',
-  locked: 'locked',
-} as const;
-
-export interface ReferenceFieldMapping {
-  /** @minLength 1 */
-  sourceColumn: string;
-  /** @minLength 1 */
-  targetFieldId: string;
-  mode: ReferenceFieldMappingMode;
-}
-
-export type WorkflowFieldType = typeof WorkflowFieldType[keyof typeof WorkflowFieldType];
-
-
-export const WorkflowFieldType = {
-  text: 'text',
-  textarea: 'textarea',
-  longtext: 'longtext',
-  name: 'name',
-  email: 'email',
-  phone: 'phone',
-  url: 'url',
-  address: 'address',
-  number: 'number',
-  decimal: 'decimal',
-  percent: 'percent',
-  price: 'price',
-  date: 'date',
-  time: 'time',
-  datetime: 'datetime',
-  duration: 'duration',
-  select: 'select',
-  enum: 'enum',
-  multiselect: 'multiselect',
-  enumlist: 'enumlist',
-  checkbox: 'checkbox',
-  yesno: 'yesno',
-  radio: 'radio',
-  progress: 'progress',
-  ref: 'ref',
-  file: 'file',
-  image: 'image',
-  thumbnail: 'thumbnail',
-  drawing: 'drawing',
-  signature: 'signature',
-  video: 'video',
-  people: 'people',
-  lookup: 'lookup',
-  color: 'color',
-  latlong: 'latlong',
-  location: 'location',
-  xy: 'xy',
-  show: 'show',
-} as const;
-
-/**
- * Server-owned projection containing only explicitly mapped target answers.
- */
-export type WorkflowFieldOptionMappedValues = {[key: string]: {[key: string]: string | number | boolean | null}};
-
-export type WorkflowFieldReferenceColumnsItem = {
-  key: string;
-  label: string;
-};
-
-export type WorkflowFieldReferenceData = {[key: string]: ReferenceValues};
-
-export type WorkflowFieldOptionLabels = {[key: string]: string};
-
-export type FieldConditionOperator = typeof FieldConditionOperator[keyof typeof FieldConditionOperator];
-
-
-export const FieldConditionOperator = {
-  equals: 'equals',
-  notEquals: 'notEquals',
-  contains: 'contains',
-} as const;
-
-export interface FieldCondition {
-  fieldId: string;
-  operator: FieldConditionOperator;
-  value: string;
-}
-
-export interface WorkflowField {
-  id: string;
-  label: string;
-  type: WorkflowFieldType;
-  required: boolean;
-  /** @nullable */
-  placeholder?: string | null;
-  options?: string[];
-  /** @nullable */
-  sourceTableId?: string | null;
-  /** @nullable */
-  sourceLabelColumn?: string | null;
-  /** @maxItems 50 */
-  referenceMappings?: ReferenceFieldMapping[];
-  /** Server-owned projection containing only explicitly mapped target answers. */
-  optionMappedValues?: WorkflowFieldOptionMappedValues;
-  referenceColumns?: WorkflowFieldReferenceColumnsItem[];
-  referenceData?: WorkflowFieldReferenceData;
-  optionLabels?: WorkflowFieldOptionLabels;
-  /** @nullable */
-  key?: string | null;
-  /** @nullable */
-  helpText?: string | null;
-  readOnly?: boolean;
-  hidden?: boolean;
-  /** @nullable */
-  defaultValue?: string | null;
-  /** @nullable */
-  initialValueExpression?: string | null;
-  /** @nullable */
-  appFormula?: string | null;
-  /** @nullable */
-  showIf?: string | null;
-  /** @nullable */
-  requiredIf?: string | null;
-  /** @nullable */
-  validIf?: string | null;
-  /** @nullable */
-  invalidMessage?: string | null;
-  /**
-     * @minimum 1
-     * @maximum 6
-     */
-  width?: number;
-  /** @nullable */
-  prefix?: string | null;
-  /** @nullable */
-  suffix?: string | null;
-  /** @nullable */
-  min?: number | null;
-  /** @nullable */
-  max?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  minLength?: number | null;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  maxLength?: number | null;
-  multiple?: boolean;
-  /** @nullable */
-  accept?: string | null;
-  /**
-     * @minimum 1
-     * @maximum 10
-     */
-  maxFiles?: number;
-  /**
-     * @minimum 1
-     * @maximum 25
-     */
-  maxFileSizeMB?: number;
-  displayCondition?: null | FieldCondition;
-}
 
 export type WorkflowStageAssigneeType = typeof WorkflowStageAssigneeType[keyof typeof WorkflowStageAssigneeType];
 

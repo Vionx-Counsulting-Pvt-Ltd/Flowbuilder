@@ -19,3 +19,4 @@
 
 export * from "./flowbuilder";
 export * from "./reference-tables";
+export * from "./staff";
