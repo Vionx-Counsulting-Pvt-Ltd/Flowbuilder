@@ -516,6 +516,22 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PersonOption"
+  /users/{userId}/invitation:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: resendUserInvitation
+      tags: [team]
+      summary: Send a fresh invitation to a pending workspace member
+      responses:
+        "200":
+          description: Invitation resent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceUser" }
   /users/{userId}:
     parameters:
       - name: userId

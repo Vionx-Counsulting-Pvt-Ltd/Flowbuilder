@@ -2372,6 +2372,80 @@ export function useListPeople<TData = Awaited<ReturnType<typeof listPeople>>, TE
 
 
 
+export const getResendUserInvitationUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}/invitation`
+}
+
+/**
+ * @summary Send a fresh invitation to a pending workspace member
+ */
+export const resendUserInvitation = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceUser> => {
+
+  return customFetch<WorkspaceUser>(getResendUserInvitationUrl(userId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResendUserInvitationMutationKey = () => ['resendUserInvitation'] as const;
+
+export const getResendUserInvitationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendUserInvitation>>, TError,ResendUserInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resendUserInvitation>>, TError,ResendUserInvitationMutationVariables, TContext> => {
+
+const mutationKey = getResendUserInvitationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resendUserInvitation>>, ResendUserInvitationMutationVariables> = (props) => {
+          const {userId} = props ?? {};
+
+          return  resendUserInvitation(userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResendUserInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof resendUserInvitation>>>
+
+    export type ResendUserInvitationMutationError = ErrorType<unknown>
+    export type ResendUserInvitationMutationVariables = {userId: string}
+
+    /**
+ * @summary Send a fresh invitation to a pending workspace member
+ */
+export const useResendUserInvitation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resendUserInvitation>>, TError,ResendUserInvitationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resendUserInvitation>>,
+        TError,
+        ResendUserInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResendUserInvitationMutationOptions(options));
+    }
+
 export const getUpdateUserUrl = (userId: string,) => {
 
 

@@ -15,3 +15,4 @@
 - [PostgreSQL timestamp precision](postgres-timestamp-precision.md) — optimistic timestamp guards must use consistent precision and strictly monotonic update versions.
 - [Workflow shortcut navigation](workflow-shortcut-navigation.md) — dashboard shortcuts open personal workflow request tables, with New request opening a context-fixed popup.
 - [Staff register policy](staff-register-policy.md) — final approval creates active staff; admins designate staff managers, and Evaluation is deferred.
+- [Invitation link policy](invitation-link-policy.md) — signup links must reach the app; broken emailed links require a fresh invitation, not key changes.

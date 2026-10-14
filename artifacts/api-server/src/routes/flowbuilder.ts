@@ -1,5 +1,7 @@
 import { syncApprovedStaff } from "../lib/staff-register";
+import { invitationRedirectUrl } from "../lib/invitation-redirect";
 import {
+  ResendUserInvitationResponse,
   ActOnRequestBody,
   ActOnRequestParams,
   ActOnRequestResponse,
@@ -2112,7 +2114,7 @@ router.post("/users", async (req, res): Promise<void> => {
       emailAddress: email,
       notify: true,
       publicMetadata: { flowbuilderTenantId: member.tenantId },
-      redirectUrl: "/sign-up",
+      redirectUrl: invitationRedirectUrl(req),
     });
     invitationId = invitation.id;
   } catch (error) {
@@ -2156,6 +2158,50 @@ router.post("/users", async (req, res): Promise<void> => {
       createdAt: user.createdAt,
     }),
   );
+});
+
+router.post("/users/:userId/invitation", async (req, res): Promise<void> => {
+  const member = currentMember(res);
+  if (!hasPermission(member, "admin")) {
+    res.status(403).json({ error: "Only workspace admins can resend invitations." }); return;
+  }
+  let redirectUrl: string;
+  try { redirectUrl = invitationRedirectUrl(req); }
+  catch { res.status(400).json({ error: "Open FlowBuilder at its public address before resending this invitation." }); return; }
+  let oldInvitationId: string | null = null;
+  let newInvitationId: string | null = null;
+  try {
+    const result = await db.transaction(async tx => {
+      const [user] = await tx.select().from(usersTable).where(and(
+        eq(usersTable.id, String(req.params.userId)), eq(usersTable.tenantId, member.tenantId),
+      )).for("update");
+      if (!user) return { status: 404 as const, error: "Team member not found." };
+      if (user.status !== "invited" || user.clerkUserId) return { status: 409 as const, error: "Only pending invitations can be resent." };
+      const invitation = await clerkClient.invitations.createInvitation({
+        emailAddress: user.email, notify: true, ignoreExisting: true, redirectUrl,
+        publicMetadata: { flowbuilderTenantId: member.tenantId },
+      });
+      newInvitationId = invitation.id;
+      oldInvitationId = user.clerkInvitationId;
+      await tx.update(usersTable).set({ clerkInvitationId: invitation.id, updatedAt: new Date() }).where(eq(usersTable.id, user.id));
+      await tx.insert(auditEventsTable).values({ tenantId: member.tenantId, actorUserId: member.id, entityType: "user", entityId: user.id, action: "Workspace invitation resent" });
+      const [role] = await tx.select().from(rolesTable).where(eq(rolesTable.id, user.roleId));
+      return { status: 200 as const, user: { id: user.id, name: user.name, email: user.email, roleId: user.roleId, roleName: role.name, status: user.status, managerId: user.managerId, createdAt: user.createdAt } };
+    });
+    if (result.status !== 200) { res.status(result.status).json({ error: result.error }); return; }
+    if (oldInvitationId && oldInvitationId !== newInvitationId) {
+      try { await clerkClient.invitations.revokeInvitation(oldInvitationId); }
+      catch (error) { req.log.warn({ error }, "Unable to revoke superseded workspace invitation"); }
+    }
+    res.json(ResendUserInvitationResponse.parse(result.user));
+  } catch (error) {
+    if (newInvitationId) {
+      try { await clerkClient.invitations.revokeInvitation(newInvitationId); }
+      catch (revokeError) { req.log.warn({ revokeError }, "Unable to revoke uncommitted workspace invitation"); }
+    }
+    req.log.warn({ error }, "Unable to resend workspace invitation");
+    res.status(409).json({ error: "The invitation could not be resent. Check whether this teammate has already registered and try again." });
+  }
 });
 
 router.patch("/users/:userId", async (req, res): Promise<void> => {
@@ -2574,7 +2620,7 @@ router.post("/platform/tenants", async (req, res): Promise<void> => {
       emailAddress: email,
       notify: true,
       publicMetadata: { flowbuilderTenantId: tenantId },
-      redirectUrl: "/sign-up",
+      redirectUrl: invitationRedirectUrl(req),
     });
     invitationId = invitation.id;
   } catch (error) {

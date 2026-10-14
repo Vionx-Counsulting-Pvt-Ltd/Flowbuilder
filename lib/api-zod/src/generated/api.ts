@@ -1924,6 +1924,25 @@ export const ListPeopleResponse = zod.array(ListPeopleResponseItem)
 
 
 /**
+ * @summary Send a fresh invitation to a pending workspace member
+ */
+export const ResendUserInvitationParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const ResendUserInvitationResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "roleId": zod.string(),
+  "roleName": zod.string(),
+  "status": zod.enum(['active', 'inactive', 'invited']),
+  "managerId": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Update a member's role or active status
  */
 export const UpdateUserParams = zod.object({
