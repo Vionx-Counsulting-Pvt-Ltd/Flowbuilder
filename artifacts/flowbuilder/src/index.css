@@ -399,6 +399,7 @@
 .overview-meter { height: 4px; overflow: hidden; border-radius: 99px; background: #eceae2; }
 .overview-meter i { display: block; height: 100%; border-radius: inherit; background: #6f9c7b; transition: width .3s ease; }
 .overview-bottlenecks .overview-meter i { background: #c68c56; }
+.overview-meter.meter-rejected i { background: #d39a95; }
 .task-main .overview-meter { max-width: 220px; margin-top: 7px; }
 .overview-workflows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .overview-workflow { display: flex; flex-direction: column; gap: 8px; border: 1px solid #ebe8df; border-radius: 12px; padding: 14px; background: #fffefa; transition: transform .14s ease, box-shadow .14s ease; }
