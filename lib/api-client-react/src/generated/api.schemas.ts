@@ -5,6 +5,10 @@
  * FlowBuilder workflow, request, team, and reporting API
  * OpenAPI spec version: 0.2.0
  */
+export interface InvitationResendInput {
+  idempotencyKey: string;
+}
+
 export interface StaffManagerInput {
   /** @maxItems 100 */
   userIds: string[];

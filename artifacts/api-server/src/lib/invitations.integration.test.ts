@@ -52,7 +52,9 @@ test("create and resend invitations target the app and preserve tenant, role and
     assert.equal((await post(`/users/${member.id}/invitation`, undefined, "requester")).status, 403);
     assert.equal((await post(`/users/${member.id}/invitation`, undefined, "foreign")).status, 404);
     assert.equal(calls.length, 1);
-    const resent = await post(`/users/${member.id}/invitation`);
+    assert.equal((await post(`/users/${member.id}/invitation`, { idempotencyKey: "invalid" })).status, 400);
+    const retryBody = { idempotencyKey: randomUUID() };
+    const resent = await post(`/users/${member.id}/invitation`, retryBody);
     assert.equal(resent.status, 200, await resent.clone().text());
     assert.equal(calls.length, 2); assert.equal(calls[1].redirectUrl, calls[0].redirectUrl);
     assert.equal(calls[1].ignoreExisting, true); assert.equal(calls[1].notify, true);
@@ -60,15 +62,35 @@ test("create and resend invitations target the app and preserve tenant, role and
     const [saved] = await db.select().from(usersTable).where(eq(usersTable.id, member.id));
     assert.equal(saved.clerkInvitationId, "synthetic-invite-2"); assert.equal(saved.roleId, id); assert.equal(saved.managerId, id);
     assert.equal(saved.status, "invited");
+    // A response lost after commit, including concurrent retries, must not
+    // send more emails or revoke the replacement that was already delivered.
+    const retries = await Promise.all([
+      post(`/users/${member.id}/invitation`, retryBody),
+      post(`/users/${member.id}/invitation`, retryBody),
+    ]);
+    assert.deepEqual(retries.map(response => response.status), [200, 200]);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(revoked, ["synthetic-invite-1"]);
+    const receipts = await db.select().from(auditEventsTable).where(eq(auditEventsTable.entityId, member.id));
+    assert.equal(receipts.filter(event => event.action === "Workspace invitation resent").length, 1);
     failDelivery = true;
     assert.equal((await post(`/users/${member.id}/invitation`)).status, 409);
     const [unchanged] = await db.select().from(usersTable).where(eq(usersTable.id, member.id));
     assert.equal(unchanged.clerkInvitationId, saved.clerkInvitationId);
     assert.deepEqual(revoked, ["synthetic-invite-1"]);
     failDelivery = false;
+    // A failed operation leaves no receipt, so its same key can safely retry.
+    const recoveryBody = { idempotencyKey: randomUUID() };
+    failDelivery = true;
+    assert.equal((await post(`/users/${member.id}/invitation`, recoveryBody)).status, 409);
+    failDelivery = false;
+    assert.equal((await post(`/users/${member.id}/invitation`, recoveryBody)).status, 200);
+    assert.equal(calls.length, 3);
+    assert.equal((await post(`/users/${member.id}/invitation`, recoveryBody)).status, 200);
+    assert.equal(calls.length, 3);
     await db.update(usersTable).set({ status: "active", clerkUserId: `${id}-accepted` }).where(eq(usersTable.id, member.id));
     assert.equal((await post(`/users/${member.id}/invitation`)).status, 409);
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
   } finally {
     server.closeAllConnections(); await new Promise<void>(r => server.close(() => r()));
     await db.delete(auditEventsTable).where(eq(auditEventsTable.tenantId, id));

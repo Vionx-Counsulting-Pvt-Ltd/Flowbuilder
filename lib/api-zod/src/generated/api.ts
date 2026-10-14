@@ -1930,6 +1930,10 @@ export const ResendUserInvitationParams = zod.object({
   "userId": zod.coerce.string()
 })
 
+export const ResendUserInvitationBody = zod.object({
+  "idempotencyKey": zod.string().uuid()
+})
+
 export const ResendUserInvitationResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),

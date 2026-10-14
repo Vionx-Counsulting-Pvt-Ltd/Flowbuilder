@@ -18,6 +18,7 @@ export * from './fieldCondition';
 export * from './fieldConditionOperator';
 export * from './getStorageObjectParams';
 export * from './healthStatus';
+export * from './invitationResendInput';
 export * from './listRequestsParams';
 export * from './listRequestsScope';
 export * from './myWorkflow';

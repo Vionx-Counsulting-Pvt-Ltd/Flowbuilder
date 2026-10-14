@@ -526,6 +526,11 @@ paths:
       operationId: resendUserInvitation
       tags: [team]
       summary: Send a fresh invitation to a pending workspace member
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvitationResendInput" }
       responses:
         "200":
           description: Invitation resent
@@ -750,6 +755,13 @@ paths:
         "403": { description: Platform administrator access required }
 components:
   schemas:
+    InvitationResendInput:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey:
+          type: string
+          format: uuid
     StaffManagerInput:
       type: object
       required: [userIds]

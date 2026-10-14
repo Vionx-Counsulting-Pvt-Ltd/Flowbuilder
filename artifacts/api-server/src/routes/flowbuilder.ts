@@ -1,6 +1,7 @@
 import { syncApprovedStaff } from "../lib/staff-register";
 import { invitationRedirectUrl } from "../lib/invitation-redirect";
 import {
+  ResendUserInvitationBody,
   ResendUserInvitationResponse,
   ActOnRequestBody,
   ActOnRequestParams,
@@ -2165,6 +2166,13 @@ router.post("/users/:userId/invitation", async (req, res): Promise<void> => {
   if (!hasPermission(member, "admin")) {
     res.status(403).json({ error: "Only workspace admins can resend invitations." }); return;
   }
+  // Older preview tabs send an empty POST; accept that during the rollout.
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) && Object.keys(req.body).length === 0
+    ? undefined : req.body;
+  const parsed = ResendUserInvitationBody.optional().safeParse(body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid invitation resend request." }); return; }
+  const operationKey = parsed.data?.idempotencyKey;
+  const receiptComment = operationKey ? `Invitation resend operation ${operationKey}` : null;
   let redirectUrl: string;
   try { redirectUrl = invitationRedirectUrl(req); }
   catch { res.status(400).json({ error: "Open FlowBuilder at its public address before resending this invitation." }); return; }
@@ -2177,6 +2185,19 @@ router.post("/users/:userId/invitation", async (req, res): Promise<void> => {
       )).for("update");
       if (!user) return { status: 404 as const, error: "Team member not found." };
       if (user.status !== "invited" || user.clerkUserId) return { status: 409 as const, error: "Only pending invitations can be resent." };
+      const [role] = await tx.select().from(rolesTable).where(eq(rolesTable.id, user.roleId));
+      const responseUser = { id: user.id, name: user.name, email: user.email, roleId: user.roleId, roleName: role.name, status: user.status, managerId: user.managerId, createdAt: user.createdAt };
+      // The row lock makes simultaneous retries share one committed delivery.
+      // Keep the receipt in the same transaction as the new invitation ID.
+      if (receiptComment) {
+        const [receipt] = await tx.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(
+          eq(auditEventsTable.tenantId, member.tenantId),
+          eq(auditEventsTable.entityType, "user"), eq(auditEventsTable.entityId, user.id),
+          eq(auditEventsTable.action, "Workspace invitation resent"),
+          eq(auditEventsTable.comment, receiptComment),
+        )).limit(1);
+        if (receipt) return { status: 200 as const, user: responseUser };
+      }
       const invitation = await clerkClient.invitations.createInvitation({
         emailAddress: user.email, notify: true, ignoreExisting: true, redirectUrl,
         publicMetadata: { flowbuilderTenantId: member.tenantId },
@@ -2184,9 +2205,8 @@ router.post("/users/:userId/invitation", async (req, res): Promise<void> => {
       newInvitationId = invitation.id;
       oldInvitationId = user.clerkInvitationId;
       await tx.update(usersTable).set({ clerkInvitationId: invitation.id, updatedAt: new Date() }).where(eq(usersTable.id, user.id));
-      await tx.insert(auditEventsTable).values({ tenantId: member.tenantId, actorUserId: member.id, entityType: "user", entityId: user.id, action: "Workspace invitation resent" });
-      const [role] = await tx.select().from(rolesTable).where(eq(rolesTable.id, user.roleId));
-      return { status: 200 as const, user: { id: user.id, name: user.name, email: user.email, roleId: user.roleId, roleName: role.name, status: user.status, managerId: user.managerId, createdAt: user.createdAt } };
+      await tx.insert(auditEventsTable).values({ tenantId: member.tenantId, actorUserId: member.id, entityType: "user", entityId: user.id, action: "Workspace invitation resent", comment: receiptComment });
+      return { status: 200 as const, user: responseUser };
     });
     if (result.status !== 200) { res.status(result.status).json({ error: result.error }); return; }
     if (oldInvitationId && oldInvitationId !== newInvitationId) {

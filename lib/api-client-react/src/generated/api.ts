@@ -26,6 +26,7 @@ import type {
   DashboardSummary,
   GetStorageObjectParams,
   HealthStatus,
+  InvitationResendInput,
   ListRequestsParams,
   Notification,
   PersonOption,
@@ -2383,14 +2384,29 @@ export const getResendUserInvitationUrl = (userId: string,) => {
 /**
  * @summary Send a fresh invitation to a pending workspace member
  */
-export const resendUserInvitation = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceUser> => {
+export const resendUserInvitation = async (userId: string,
+    invitationResendInput?: InvitationResendInput, options?: Parameters<typeof customFetch>[1]): Promise<WorkspaceUser> => {
 
-  return customFetch<WorkspaceUser>(getResendUserInvitationUrl(userId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<WorkspaceUser>(getResendUserInvitationUrl(userId),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(invitationResendInput)
   }
 );}
 
@@ -2415,9 +2431,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof resendUserInvitation>>, ResendUserInvitationMutationVariables> = (props) => {
-          const {userId} = props ?? {};
+          const {userId,data} = props ?? {};
 
-          return  resendUserInvitation(userId,requestOptions)
+          return  resendUserInvitation(userId,data,requestOptions)
         }
 
 
@@ -2428,9 +2444,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ResendUserInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof resendUserInvitation>>>
-
+    export type ResendUserInvitationMutationBody = BodyType<InvitationResendInput> | undefined
     export type ResendUserInvitationMutationError = ErrorType<unknown>
-    export type ResendUserInvitationMutationVariables = {userId: string}
+    export type ResendUserInvitationMutationVariables = {userId: string;data?: BodyType<InvitationResendInput>}
 
     /**
  * @summary Send a fresh invitation to a pending workspace member

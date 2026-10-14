@@ -20,3 +20,9 @@ Clerk's invitation URL may legitimately begin on its accounts domain at the tick
 **Why:** A real synthetic invitation returned a redirect from Clerk's acceptance endpoint to FlowBuilder's sign-up route with the signup ticket. Checking the invitation object's initial hostname alone would incorrectly classify a working link as broken.
 
 **How to apply:** Verify the acceptance response's redirect destination and ticket presence, not just the first URL's hostname. Keep invitation tickets transient and never print them in logs or save them in project files.
+
+Invitation delivery and browser confirmation are separate outcomes. Connection failures must not automatically trigger another delivery without a durable idempotency receipt.
+
+**Why:** A member saw “Failed to fetch” even though a resend had succeeded in server logs. The exact network failure was not reproduced; treating that message as proof of delivery failure risks duplicate emails and invalidating the link just sent.
+
+**How to apply:** Reuse the same operation key for transport retries, record completed delivery atomically with the saved invitation, and serialize retries for the same member. Retry transport failures only, not authentication or provider rejections. Do not claim the original connection fault was reproduced.
